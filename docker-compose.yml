@@ -1,0 +1,7 @@
+services:
+  app:
+    image: techcombank-parser
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./techcombank.db:/data/techcombank.db

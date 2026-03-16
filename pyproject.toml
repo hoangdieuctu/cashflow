@@ -29,6 +29,9 @@ techcombank-parser = "techcombank_parser.cli:cli"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+techcombank_parser = ["web/templates/*", "web/static/**/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
