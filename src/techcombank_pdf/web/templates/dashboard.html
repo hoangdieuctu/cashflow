@@ -136,23 +136,19 @@
 
     <!-- Category Spending Breakdown -->
     {% if category_summary.categories %}
-    <div class="row g-3 mt-1">
-        <div class="col-lg-7">
-            <div class="card" style="height: 100%;">
-                <div class="card-header-custom">
-                    <h6><i class="bi bi-layers-fill me-2" style="color: #7C3AED;"></i>Spending by Category (Monthly)</h6>
-                </div>
-                <div style="padding: 1rem 1.25rem; flex: 1; min-height: 260px;">
-                    <canvas id="categoryChart"></canvas>
-                </div>
-            </div>
+    <div class="card mt-3">
+        <div class="card-header-custom">
+            <h6><i class="bi bi-layers-fill me-2" style="color: #7C3AED;"></i>Spending by Category (Monthly)</h6>
         </div>
-        <div class="col-lg-5">
-            <div class="card" style="height: 100%;">
-                <div class="card-header-custom">
-                    <h6><i class="bi bi-list-check me-2" style="color: #D97706;"></i>Category Totals</h6>
-                </div>
-                <div class="table-responsive" style="flex: 1; overflow-y: auto;">
+        <div style="padding: 1rem 1.25rem; min-height: 280px;">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+    <div class="card mt-3">
+        <div class="card-header-custom">
+            <h6><i class="bi bi-list-check me-2" style="color: #D97706;"></i>Category Totals</h6>
+        </div>
+        <div class="table-responsive">
                     <table class="table mb-0" style="font-size: 0.82rem;">
                         <thead>
                             <tr>
@@ -188,8 +184,6 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
     {% endif %}
 </div>
 
