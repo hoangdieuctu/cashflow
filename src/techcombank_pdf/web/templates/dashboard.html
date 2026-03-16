@@ -152,7 +152,7 @@
                     <table class="table mb-0" style="font-size: 0.82rem;">
                         <thead>
                             <tr>
-                                <th>Category</th>
+                                <th style="white-space: nowrap;">Category</th>
                                 {% for m in category_summary.months %}
                                 <th class="text-end">{{ m[5:] }}</th>
                                 {% endfor %}
@@ -162,7 +162,7 @@
                         <tbody>
                             {% for cat in category_summary.categories %}
                             <tr>
-                                <td><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ [
+                                <td style="white-space: nowrap;"><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ [
                                     '#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'
                                 ][loop.index0 % 10] }}; margin-right: 6px;"></span>{{ cat.name }} <span style="font-size: 0.65rem; color: #94A3B8; margin-left: 2px;">{{ cat.count }}</span></td>
                                 {% for m in category_summary.months %}
@@ -173,7 +173,7 @@
                             {% endfor %}
                             {% if category_summary.uncategorized.total > 0 %}
                             <tr style="color: #94A3B8;">
-                                <td><i class="bi bi-question-circle me-1"></i>Uncategorized <span style="font-size: 0.65rem; margin-left: 2px;">{{ category_summary.uncategorized.count }}</span></td>
+                                <td style="white-space: nowrap;"><i class="bi bi-question-circle me-1"></i>Uncategorized <span style="font-size: 0.65rem; margin-left: 2px;">{{ category_summary.uncategorized.count }}</span></td>
                                 {% for m in category_summary.months %}
                                 <td class="text-end">{{ "{:,.0f}".format(category_summary.uncategorized.monthly.get(m, 0)) }}</td>
                                 {% endfor %}
