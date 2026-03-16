@@ -246,7 +246,8 @@ class Repository:
             f"""SELECT
                 substr(transaction_date, 1, 7) as month,
                 COALESCE(category, '') as cat,
-                SUM(CAST(billing_amount_vnd AS REAL)) as spending
+                SUM(CAST(billing_amount_vnd AS REAL)) as spending,
+                COUNT(*) as txn_count
                FROM transactions
                WHERE transaction_type = 'debit' {where}
                GROUP BY month, cat
@@ -256,6 +257,7 @@ class Repository:
 
         months_set: set[str] = set()
         cat_data: dict[str, dict[str, float]] = {}
+        cat_counts: dict[str, int] = {}
 
         for row in rows:
             month = row["month"]
@@ -263,18 +265,20 @@ class Repository:
             months_set.add(month)
             if cat not in cat_data:
                 cat_data[cat] = {}
+                cat_counts[cat] = 0
             cat_data[cat][month] = row["spending"]
+            cat_counts[cat] += row["txn_count"]
 
         months = sorted(months_set)
 
         categories = []
-        uncategorized = {"monthly": {}, "total": 0.0}
+        uncategorized = {"monthly": {}, "total": 0.0, "count": 0}
 
         for cat, monthly in sorted(cat_data.items()):
             total = sum(monthly.values())
-            entry = {"name": cat, "monthly": monthly, "total": total}
+            entry = {"name": cat, "monthly": monthly, "total": total, "count": cat_counts[cat]}
             if cat == "":
-                uncategorized = {"monthly": monthly, "total": total}
+                uncategorized = {"monthly": monthly, "total": total, "count": cat_counts[cat]}
             else:
                 categories.append(entry)
 

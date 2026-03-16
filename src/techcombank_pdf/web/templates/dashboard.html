@@ -154,6 +154,7 @@
                         <thead>
                             <tr>
                                 <th>Category</th>
+                                <th class="text-center">Txns</th>
                                 {% for m in category_summary.months %}
                                 <th class="text-end">{{ m[5:] }}</th>
                                 {% endfor %}
@@ -166,6 +167,7 @@
                                 <td><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ [
                                     '#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'
                                 ][loop.index0 % 10] }}; margin-right: 6px;"></span>{{ cat.name }}</td>
+                                <td class="text-center" style="color: #94A3B8;">{{ cat.count }}</td>
                                 {% for m in category_summary.months %}
                                 <td class="text-end" style="color: #64748B;">{{ "{:,.0f}".format(cat.monthly.get(m, 0)) }}</td>
                                 {% endfor %}
@@ -175,6 +177,7 @@
                             {% if category_summary.uncategorized.total > 0 %}
                             <tr style="color: #94A3B8;">
                                 <td><i class="bi bi-question-circle me-1"></i>Uncategorized</td>
+                                <td class="text-center">{{ category_summary.uncategorized.count }}</td>
                                 {% for m in category_summary.months %}
                                 <td class="text-end">{{ "{:,.0f}".format(category_summary.uncategorized.monthly.get(m, 0)) }}</td>
                                 {% endfor %}
@@ -258,7 +261,9 @@
                         <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
                         <td style="min-width: 140px;">
                             <div class="category-cell" data-txn-id="{{ txn.id }}" data-merchant="{{ txn.merchant_name or '' }}">
-                                <span class="category-display" onclick="editCategory(this)" style="cursor: pointer; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 6px; {{ 'background: #F0F9FF; color: #0369A1;' if txn.category else 'background: #F8FAFC; color: #CBD5E1;' }}">
+                                <span class="category-display" onclick="editCategory(this)" data-category="{{ txn.category or '' }}"
+                                      style="cursor: pointer; font-size: 0.78rem; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 600;
+                                             {{ 'background: #F8FAFC; color: #CBD5E1;' if not txn.category }}">
                                     {{ txn.category or '+ Add' }}
                                 </span>
                                 <div class="category-edit d-none">
@@ -481,6 +486,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Category inline editing -->
 <script>
+const CAT_COLORS = ['#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'];
+const CAT_BG = ['#FEF2F2','#EFF6FF','#F0FDF4','#FFFBEB','#F5F3FF','#FDF2F8','#ECFEFF','#F7FEE7','#FFF7ED','#EEF2FF'];
+const _catIndex = {};
+let _catNext = 0;
+
+function getCatColor(name) {
+    if (!name) return null;
+    if (!(name in _catIndex)) _catIndex[name] = _catNext++;
+    const i = _catIndex[name] % CAT_COLORS.length;
+    return { fg: CAT_COLORS[i], bg: CAT_BG[i] };
+}
+
+// Colorize all category badges on load
+document.querySelectorAll('.category-display[data-category]').forEach(el => {
+    const cat = el.dataset.category;
+    if (cat) {
+        const c = getCatColor(cat);
+        el.style.background = c.bg;
+        el.style.color = c.fg;
+    }
+});
 function editCategory(el) {
     const cell = el.closest('.category-cell');
     cell.querySelector('.category-display').classList.add('d-none');
@@ -528,15 +554,24 @@ function saveCategory(input) {
                     if (c.dataset.merchant === merchant) {
                         const d = c.querySelector('.category-display');
                         d.textContent = category;
-                        d.style.background = '#F0F9FF';
-                        d.style.color = '#0369A1';
+                        d.dataset.category = category;
+                        const col = getCatColor(category);
+                        d.style.background = col ? col.bg : '#F8FAFC';
+                        d.style.color = col ? col.fg : '#CBD5E1';
                     }
                 });
                 showNotify('Updated ' + data.updated_count + ' transactions from "' + merchant + '"');
             } else {
                 display.textContent = category || '+ Add';
-                display.style.background = category ? '#F0F9FF' : '#F8FAFC';
-                display.style.color = category ? '#0369A1' : '#CBD5E1';
+                display.dataset.category = category;
+                if (category) {
+                    const col = getCatColor(category);
+                    display.style.background = col.bg;
+                    display.style.color = col.fg;
+                } else {
+                    display.style.background = '#F8FAFC';
+                    display.style.color = '#CBD5E1';
+                }
                 if (category) showNotify('Category saved');
             }
             // Add to datalist if new
