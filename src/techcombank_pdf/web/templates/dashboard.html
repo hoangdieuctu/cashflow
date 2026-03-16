@@ -198,11 +198,11 @@
 
     <!-- Filters -->
     <div class="card mb-3" style="padding: 0.85rem 1.25rem;">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" id="filterForm" class="row g-2 align-items-end">
             {% if statements|length > 1 %}
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statement</label>
-                <select class="form-select form-select-sm" name="statement_id" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                <select class="form-select form-select-sm" name="statement_id" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                     <option value="">All statements</option>
                     {% for stmt in statements %}
                     <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>{{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:30] }} ({{ stmt.transaction_count }} txns)</option>
@@ -212,7 +212,7 @@
             {% endif %}
             <div class="col-md-3">
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
-                <select class="form-select form-select-sm" name="category" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                <select class="form-select form-select-sm" name="category" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                     <option value="">All</option>
                     <option value="__uncategorized__" {{ 'selected' if filters.category == '__uncategorized__' }}>Uncategorized</option>
                     {% for cat in categories %}
@@ -224,16 +224,9 @@
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
-                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
+                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;"
+                           onkeydown="if(event.key==='Enter'){this.form.submit();event.preventDefault();}">
                 </div>
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem 0.8rem;">
-                    <i class="bi bi-funnel-fill me-1"></i> Filter
-                </button>
-            </div>
-            <div class="col-auto">
-                <a href="{{ url_for('main.index') }}" class="btn btn-sm" style="background: #F1F5F9; color: #64748B; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem 0.8rem;">Clear</a>
             </div>
         </form>
     </div>
