@@ -24,57 +24,9 @@ def _get_repo():
     return Repository(current_app.config["DB_PATH"])
 
 
-@bp.route("/", methods=["GET", "POST"])
+@bp.route("/")
 def index():
-    """Single-page dashboard with upload, stats, charts, and transactions."""
-    # Handle PDF upload
-    if request.method == "POST":
-        file = request.files.get("pdf_file")
-        if not file or not file.filename or not file.filename.lower().endswith(".pdf"):
-            flash("Please upload a valid PDF file.", "error")
-            return redirect(url_for("main.index"))
-
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            file.save(tmp.name)
-            tmp_path = Path(tmp.name)
-
-        try:
-            from techcombank_pdf.parser.statement_parser import parse_statement
-
-            password = request.form.get("password") or None
-            result = parse_statement(tmp_path, password=password)
-            result.metadata.source_file = file.filename
-
-            if result.transaction_count == 0:
-                flash(
-                    f"No transactions found in {file.filename}. "
-                    "The PDF may be password-protected (enter the password above) "
-                    "or the statement format is not yet supported.",
-                    "warning",
-                )
-                return redirect(url_for("main.index"))
-
-            with _get_repo() as repo:
-                repo.import_parse_result(result)
-
-            flash(
-                f"Successfully imported {result.transaction_count} transactions "
-                f"from {file.filename} (method: {result.parse_method}).",
-                "success",
-            )
-
-            if result.warnings:
-                for w in result.warnings:
-                    flash(w, "warning")
-
-        except Exception as e:
-            flash(f"Error parsing PDF: {e}", "error")
-        finally:
-            tmp_path.unlink(missing_ok=True)
-
-        return redirect(url_for("main.index"))
-
-    # GET — render full dashboard
+    """Single-page dashboard with stats, charts, and transactions."""
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     txn_type = request.args.get("type")
@@ -123,6 +75,59 @@ def index():
             "search": search or "",
         },
     )
+
+
+@bp.route("/upload", methods=["GET", "POST"])
+def upload():
+    """Upload and parse a PDF statement."""
+    if request.method == "GET":
+        return render_template("upload.html")
+
+    file = request.files.get("pdf_file")
+    if not file or not file.filename or not file.filename.lower().endswith(".pdf"):
+        flash("Please upload a valid PDF file.", "error")
+        return redirect(url_for("main.upload"))
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        file.save(tmp.name)
+        tmp_path = Path(tmp.name)
+
+    try:
+        from techcombank_pdf.parser.statement_parser import parse_statement
+
+        password = request.form.get("password") or None
+        result = parse_statement(tmp_path, password=password)
+        result.metadata.source_file = file.filename
+
+        if result.transaction_count == 0:
+            flash(
+                f"No transactions found in {file.filename}. "
+                "The PDF may be password-protected (enter the password above) "
+                "or the statement format is not yet supported.",
+                "warning",
+            )
+            return redirect(url_for("main.upload"))
+
+        with _get_repo() as repo:
+            repo.import_parse_result(result)
+
+        flash(
+            f"Successfully imported {result.transaction_count} transactions "
+            f"from {file.filename} (method: {result.parse_method}).",
+            "success",
+        )
+
+        if result.warnings:
+            for w in result.warnings:
+                flash(w, "warning")
+
+    except Exception as e:
+        flash(f"Error parsing PDF: {e}", "error")
+        return redirect(url_for("main.upload"))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return redirect(url_for("main.index"))
 
 
 @bp.route("/api/summary")

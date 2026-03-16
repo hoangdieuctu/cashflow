@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 560px; margin: 1.5rem auto 0;">
+    <div class="card" style="padding: 2rem;">
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="up-icon" id="uploadIcon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+                <h6 id="uploadTitle">Drop PDF here or click to browse</h6>
+                <p id="uploadHint">Techcombank credit card statement</p>
+                <div class="file-tag d-none" id="fileTag">
+                    <i class="bi bi-file-earmark-pdf-fill" style="color: var(--tcb-red);"></i>
+                    <span id="fileName"></span>
+                </div>
+            </div>
+            <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
+
+            <div class="input-group input-group-sm mt-3">
+                <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;">
+                    <i class="bi bi-lock" style="color: #94A3B8; font-size: 0.8rem;"></i>
+                </span>
+                <input type="password" class="form-control" name="password" placeholder="PDF password (if required)" style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
+            </div>
+
+            <button type="submit" class="btn upload-btn w-100 mt-3" id="submitBtn" disabled>
+                <i class="bi bi-lightning-fill me-1"></i> Parse & Import
+            </button>
+
+            <div class="d-flex gap-3 justify-content-center mt-2" style="color: #94A3B8; font-size: 0.72rem;">
+                <span><i class="bi bi-table me-1"></i>Auto-extract tables</span>
+                <span><i class="bi bi-translate me-1"></i>Vietnamese</span>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileTag = document.getElementById('fileTag');
+const fileNameSpan = document.getElementById('fileName');
+const uploadTitle = document.getElementById('uploadTitle');
+const uploadHint = document.getElementById('uploadHint');
+const uploadIcon = document.getElementById('uploadIcon');
+const submitBtn = document.getElementById('submitBtn');
+
+function setFile(file) {
+    fileNameSpan.textContent = file.name;
+    fileTag.classList.remove('d-none');
+    uploadTitle.textContent = 'File selected';
+    uploadHint.textContent = 'Click to change';
+    uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
+    dropZone.classList.add('has-file');
+    submitBtn.disabled = false;
+}
+fileInput.addEventListener('change', function() { if (this.files.length) setFile(this.files[0]); });
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
+dropZone.addEventListener('drop', ev => {
+    const f = ev.dataTransfer.files;
+    if (f.length && f[0].name.toLowerCase().endsWith('.pdf')) { fileInput.files = f; setFile(f[0]); }
+});
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Parsing...';
+});
+</script>
+{% endblock %}

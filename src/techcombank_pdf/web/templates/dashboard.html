@@ -1,44 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- ══════════════════════════════════════════════ -->
-<!-- SECTION: Upload                                -->
-<!-- ══════════════════════════════════════════════ -->
-<div id="section-upload" class="mb-4">
-    <div class="section-title">Upload Statement</div>
-    <div class="card" style="padding: 1.25rem;">
-        <form method="post" enctype="multipart/form-data" id="uploadForm" class="row g-3 align-items-center">
-            <div class="col-lg-7">
-                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="up-icon" id="uploadIcon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
-                    <h6 id="uploadTitle">Drop PDF here or click to browse</h6>
-                    <p id="uploadHint">Techcombank credit card statement</p>
-                    <div class="file-tag d-none" id="fileTag">
-                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--tcb-red);"></i>
-                        <span id="fileName"></span>
-                    </div>
-                </div>
-                <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
-            </div>
-            <div class="col-lg-5 d-flex flex-column gap-2">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;">
-                        <i class="bi bi-lock" style="color: #94A3B8; font-size: 0.8rem;"></i>
-                    </span>
-                    <input type="password" class="form-control" name="password" placeholder="PDF password (if required)" style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
-                </div>
-                <button type="submit" class="btn upload-btn" id="submitBtn" disabled>
-                    <i class="bi bi-lightning-fill me-1"></i> Parse & Import
-                </button>
-                <div class="d-flex gap-3 justify-content-center" style="color: #94A3B8; font-size: 0.72rem;">
-                    <span><i class="bi bi-table me-1"></i>Auto-extract tables</span>
-                    <span><i class="bi bi-translate me-1"></i>Vietnamese</span>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
 {% if not statements %}
 <!-- ══════════════════════════════════════════════ -->
 <!-- Empty state — no statements imported yet       -->
@@ -47,11 +9,51 @@
     <div class="empty-state" style="padding: 3.5rem 2rem;">
         <div class="empty-icon"><i class="bi bi-credit-card-2-front"></i></div>
         <h5>No statements imported yet</h5>
-        <p>Upload your first Techcombank credit card statement above to see spending analytics and transaction history.</p>
+        <p>Upload your first Techcombank credit card statement to see spending analytics and transaction history.</p>
+        <a href="{{ url_for('main.upload') }}" class="btn btn-sm" style="background: linear-gradient(135deg, var(--tcb-red), #FF4D6D); color: #fff; border-radius: 10px; font-weight: 700; padding: 0.6rem 1.5rem;">
+            <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Statement
+        </a>
     </div>
 </div>
 
 {% else %}
+<!-- ══════════════════════════════════════════════ -->
+<!-- Filters (top of page)                          -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="card mb-4" style="padding: 0.85rem 1.25rem;">
+    <form method="get" id="filterForm" class="row g-2 align-items-end">
+        {% if statements|length > 1 %}
+        <div class="col-md-4">
+            <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statement</label>
+            <select class="form-select form-select-sm" name="statement_id" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                <option value="">All statements</option>
+                {% for stmt in statements %}
+                <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>{{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:30] }} ({{ stmt.transaction_count }} txns)</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="col-md-3">
+            <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
+            <select class="form-select form-select-sm" name="category" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                <option value="">All</option>
+                <option value="__uncategorized__" {{ 'selected' if filters.category == '__uncategorized__' }}>Uncategorized</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {{ 'selected' if filters.category == cat }}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
+                <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;"
+                       onkeydown="if(event.key==='Enter'){this.form.submit();event.preventDefault();}">
+            </div>
+        </div>
+    </form>
+</div>
+
 <!-- ══════════════════════════════════════════════ -->
 <!-- SECTION: Overview (stats + charts)             -->
 <!-- ══════════════════════════════════════════════ -->
@@ -194,45 +196,10 @@
 </div>
 
 <!-- ══════════════════════════════════════════════ -->
-<!-- SECTION: Transactions (filters + table)        -->
+<!-- SECTION: Transactions                          -->
 <!-- ══════════════════════════════════════════════ -->
 <div id="section-transactions">
     <div class="section-title">Transactions</div>
-
-    <!-- Filters -->
-    <div class="card mb-3" style="padding: 0.85rem 1.25rem;">
-        <form method="get" id="filterForm" class="row g-2 align-items-end">
-            {% if statements|length > 1 %}
-            <div class="col-md-4">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statement</label>
-                <select class="form-select form-select-sm" name="statement_id" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-                    <option value="">All statements</option>
-                    {% for stmt in statements %}
-                    <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>{{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:30] }} ({{ stmt.transaction_count }} txns)</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-            <div class="col-md-3">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
-                <select class="form-select form-select-sm" name="category" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-                    <option value="">All</option>
-                    <option value="__uncategorized__" {{ 'selected' if filters.category == '__uncategorized__' }}>Uncategorized</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat }}" {{ 'selected' if filters.category == cat }}>{{ cat }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
-                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;"
-                           onkeydown="if(event.key==='Enter'){this.form.submit();event.preventDefault();}">
-                </div>
-            </div>
-        </form>
-    </div>
 
     <!-- Table -->
     <div class="card">
@@ -341,39 +308,6 @@
     <option value="{{ cat }}">
     {% endfor %}
 </datalist>
-
-<!-- Upload JS -->
-<script>
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const fileTag = document.getElementById('fileTag');
-const fileNameSpan = document.getElementById('fileName');
-const uploadTitle = document.getElementById('uploadTitle');
-const uploadHint = document.getElementById('uploadHint');
-const uploadIcon = document.getElementById('uploadIcon');
-const submitBtn = document.getElementById('submitBtn');
-
-function setFile(file) {
-    fileNameSpan.textContent = file.name;
-    fileTag.classList.remove('d-none');
-    uploadTitle.textContent = 'File selected';
-    uploadHint.textContent = 'Click to change';
-    uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
-    dropZone.classList.add('has-file');
-    submitBtn.disabled = false;
-}
-fileInput.addEventListener('change', function() { if (this.files.length) setFile(this.files[0]); });
-['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
-['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
-dropZone.addEventListener('drop', ev => {
-    const f = ev.dataTransfer.files;
-    if (f.length && f[0].name.toLowerCase().endsWith('.pdf')) { fileInput.files = f; setFile(f[0]); }
-});
-document.getElementById('uploadForm').addEventListener('submit', function() {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Parsing...';
-});
-</script>
 
 {% if summary.total_transactions > 0 %}
 <!-- Charts JS -->

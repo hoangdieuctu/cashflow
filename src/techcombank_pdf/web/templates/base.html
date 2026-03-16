@@ -53,14 +53,19 @@
             text-transform: uppercase; letter-spacing: 1px;
             color: #475569;
         }
-        .sidebar-nav .nav-link-item {
+        .sidebar-nav a {
             display: flex; align-items: center; gap: 0.75rem;
             padding: 0.6rem 1.25rem; margin: 2px 0.6rem; border-radius: 8px;
             color: #94A3B8; text-decoration: none; font-size: 0.85rem; font-weight: 500;
-            cursor: pointer; transition: all 0.15s; border: none; background: none; width: calc(100% - 1.2rem);
+            transition: all 0.15s;
         }
-        .sidebar-nav .nav-link-item:hover { background: rgba(255,255,255,0.06); color: #E2E8F0; }
-        .sidebar-nav .nav-link-item .bi { font-size: 1.1rem; width: 20px; text-align: center; }
+        .sidebar-nav a:hover { background: rgba(255,255,255,0.06); color: #E2E8F0; }
+        .sidebar-nav a.active {
+            background: linear-gradient(135deg, var(--tcb-red), #FF4D6D);
+            color: #fff; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(228,0,43,0.3);
+        }
+        .sidebar-nav a .bi { font-size: 1.1rem; width: 20px; text-align: center; }
 
         .sidebar-footer {
             padding: 1rem 1.25rem;
@@ -214,15 +219,12 @@
         </div>
         <nav class="sidebar-nav">
             <div class="nav-section">Navigation</div>
-            <button class="nav-link-item" onclick="document.getElementById('section-overview').scrollIntoView({behavior:'smooth'})">
-                <i class="bi bi-grid-1x2-fill"></i> Overview
-            </button>
-            <button class="nav-link-item" onclick="document.getElementById('section-upload').scrollIntoView({behavior:'smooth'})">
+            <a href="{{ url_for('main.index') }}" class="{% if request.endpoint == 'main.index' %}active{% endif %}">
+                <i class="bi bi-grid-1x2-fill"></i> Dashboard
+            </a>
+            <a href="{{ url_for('main.upload') }}" class="{% if request.endpoint == 'main.upload' %}active{% endif %}">
                 <i class="bi bi-cloud-arrow-up-fill"></i> Upload
-            </button>
-            <button class="nav-link-item" onclick="document.getElementById('section-transactions').scrollIntoView({behavior:'smooth'})">
-                <i class="bi bi-receipt"></i> Transactions
-            </button>
+            </a>
         </nav>
         <div class="sidebar-footer">
             Techcombank PDF Parser v0.1
