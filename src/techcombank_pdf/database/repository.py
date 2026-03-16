@@ -143,10 +143,20 @@ class Repository:
 
         return [dict(row) for row in rows]
 
-    def get_spending_summary(self, statement_id: int | None = None) -> dict[str, Any]:
+    def get_spending_summary(self, statement_id: int | None = None, category: str | None = None) -> dict[str, Any]:
         """Get aggregate spending summary."""
-        where = "WHERE statement_id = ?" if statement_id else ""
-        params = [statement_id] if statement_id else []
+        conditions: list[str] = []
+        params: list[Any] = []
+        if statement_id:
+            conditions.append("statement_id = ?")
+            params.append(statement_id)
+        if category == "__uncategorized__":
+            conditions.append("(category IS NULL OR category = '')")
+        elif category:
+            conditions.append("category = ?")
+            params.append(category)
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         row = self.conn.execute(
             f"""SELECT
@@ -187,15 +197,30 @@ class Repository:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def get_transaction_count(self, statement_id: int | None = None) -> int:
-        """Get total number of transactions."""
+    def get_transaction_count(
+        self,
+        statement_id: int | None = None,
+        category: str | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Get total number of transactions matching filters."""
+        conditions: list[str] = []
+        params: list[Any] = []
         if statement_id:
-            row = self.conn.execute(
-                "SELECT COUNT(*) as cnt FROM transactions WHERE statement_id = ?",
-                (statement_id,),
-            ).fetchone()
-        else:
-            row = self.conn.execute("SELECT COUNT(*) as cnt FROM transactions").fetchone()
+            conditions.append("statement_id = ?")
+            params.append(statement_id)
+        if category == "__uncategorized__":
+            conditions.append("(category IS NULL OR category = '')")
+        elif category:
+            conditions.append("category = ?")
+            params.append(category)
+        if search:
+            conditions.append("description LIKE ?")
+            params.append(f"%{search}%")
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        row = self.conn.execute(
+            f"SELECT COUNT(*) as cnt FROM transactions {where}", params
+        ).fetchone()
         return row["cnt"]
 
     def update_transaction_category(self, txn_id: int, category: str | None) -> bool:
@@ -226,7 +251,7 @@ class Repository:
         ).fetchall()
         return [row["category"] for row in rows]
 
-    def get_category_monthly_summary(self, statement_id: int | None = None) -> dict[str, Any]:
+    def get_category_monthly_summary(self, statement_id: int | None = None, category: str | None = None) -> dict[str, Any]:
         """Get spending by category per month (debit only).
 
         Returns:
@@ -239,8 +264,18 @@ class Repository:
                 "uncategorized": {"monthly": {...}, "total": ...}
             }
         """
-        where = "AND statement_id = ?" if statement_id else ""
-        params: list[Any] = [statement_id] if statement_id else []
+        conditions = ["transaction_type = 'debit'"]
+        params: list[Any] = []
+        if statement_id:
+            conditions.append("statement_id = ?")
+            params.append(statement_id)
+        if category == "__uncategorized__":
+            conditions.append("(category IS NULL OR category = '')")
+        elif category:
+            conditions.append("category = ?")
+            params.append(category)
+
+        where = "WHERE " + " AND ".join(conditions)
 
         rows = self.conn.execute(
             f"""SELECT
@@ -249,7 +284,7 @@ class Repository:
                 SUM(CAST(billing_amount_vnd AS REAL)) as spending,
                 COUNT(*) as txn_count
                FROM transactions
-               WHERE transaction_type = 'debit' {where}
+               {where}
                GROUP BY month, cat
                ORDER BY month, cat""",
             params,

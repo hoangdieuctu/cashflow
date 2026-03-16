@@ -112,22 +112,22 @@
 
     <div class="row g-3">
         <div class="col-lg-8">
-            <div class="card">
+            <div class="card" style="height: 100%;">
                 <div class="card-header-custom">
                     <h6><i class="bi bi-bar-chart-fill me-2" style="color: var(--tcb-red);"></i>Monthly Spending</h6>
                 </div>
-                <div style="padding: 1rem 1.25rem;">
-                    <canvas id="monthlyChart" height="280"></canvas>
+                <div style="padding: 1rem 1.25rem; flex: 1; min-height: 260px;">
+                    <canvas id="monthlyChart"></canvas>
                 </div>
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="card">
+            <div class="card" style="height: 100%;">
                 <div class="card-header-custom">
                     <h6><i class="bi bi-pie-chart-fill me-2" style="color: #2563EB;"></i>Debit vs Credit</h6>
                 </div>
-                <div style="padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: center;">
-                    <canvas id="typeChart" height="220"></canvas>
+                <div style="padding: 1.5rem 1.25rem; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 260px;">
+                    <canvas id="typeChart"></canvas>
                 </div>
             </div>
         </div>

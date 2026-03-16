@@ -38,7 +38,7 @@ def index():
     per_page = 50
 
     with _get_repo() as repo:
-        summary = repo.get_spending_summary(statement_id=statement_id)
+        summary = repo.get_spending_summary(statement_id=statement_id, category=category)
         statements = repo.get_statements()
         txns = repo.get_transactions(
             start_date=start_date,
@@ -50,9 +50,9 @@ def index():
             limit=per_page,
             offset=(page - 1) * per_page,
         )
-        total = repo.get_transaction_count(statement_id=statement_id)
+        total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search)
         categories = repo.get_all_categories()
-        category_summary = repo.get_category_monthly_summary(statement_id=statement_id)
+        category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category)
 
     total_pages = max(1, (total + per_page - 1) // per_page)
 
