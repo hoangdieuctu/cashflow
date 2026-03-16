@@ -100,6 +100,7 @@ class Repository:
         transaction_type: str | None = None,
         category: str | None = None,
         search: str | None = None,
+        statement_id: int | None = None,
         limit: int = 500,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
@@ -121,6 +122,9 @@ class Repository:
         elif category:
             conditions.append("t.category = ?")
             params.append(category)
+        if statement_id:
+            conditions.append("t.statement_id = ?")
+            params.append(statement_id)
         if search:
             conditions.append("t.description LIKE ?")
             params.append(f"%{search}%")
@@ -139,24 +143,29 @@ class Repository:
 
         return [dict(row) for row in rows]
 
-    def get_spending_summary(self) -> dict[str, Any]:
+    def get_spending_summary(self, statement_id: int | None = None) -> dict[str, Any]:
         """Get aggregate spending summary."""
+        where = "WHERE statement_id = ?" if statement_id else ""
+        params = [statement_id] if statement_id else []
+
         row = self.conn.execute(
-            """SELECT
+            f"""SELECT
                 COUNT(*) as total_transactions,
                 SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as total_debit,
                 SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as total_credit
-               FROM transactions"""
+               FROM transactions {where}""",
+            params,
         ).fetchone()
 
         monthly = self.conn.execute(
-            """SELECT
+            f"""SELECT
                 substr(transaction_date, 1, 7) as month,
                 SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as spending,
                 COUNT(*) as count
-               FROM transactions
+               FROM transactions {where}
                GROUP BY substr(transaction_date, 1, 7)
-               ORDER BY month"""
+               ORDER BY month""",
+            params,
         ).fetchall()
 
         return {
@@ -178,9 +187,15 @@ class Repository:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def get_transaction_count(self) -> int:
+    def get_transaction_count(self, statement_id: int | None = None) -> int:
         """Get total number of transactions."""
-        row = self.conn.execute("SELECT COUNT(*) as cnt FROM transactions").fetchone()
+        if statement_id:
+            row = self.conn.execute(
+                "SELECT COUNT(*) as cnt FROM transactions WHERE statement_id = ?",
+                (statement_id,),
+            ).fetchone()
+        else:
+            row = self.conn.execute("SELECT COUNT(*) as cnt FROM transactions").fetchone()
         return row["cnt"]
 
     def update_transaction_category(self, txn_id: int, category: str | None) -> bool:
@@ -211,7 +226,7 @@ class Repository:
         ).fetchall()
         return [row["category"] for row in rows]
 
-    def get_category_monthly_summary(self) -> dict[str, Any]:
+    def get_category_monthly_summary(self, statement_id: int | None = None) -> dict[str, Any]:
         """Get spending by category per month (debit only).
 
         Returns:
@@ -224,15 +239,19 @@ class Repository:
                 "uncategorized": {"monthly": {...}, "total": ...}
             }
         """
+        where = "AND statement_id = ?" if statement_id else ""
+        params: list[Any] = [statement_id] if statement_id else []
+
         rows = self.conn.execute(
-            """SELECT
+            f"""SELECT
                 substr(transaction_date, 1, 7) as month,
                 COALESCE(category, '') as cat,
                 SUM(CAST(billing_amount_vnd AS REAL)) as spending
                FROM transactions
-               WHERE transaction_type = 'debit'
+               WHERE transaction_type = 'debit' {where}
                GROUP BY month, cat
-               ORDER BY month, cat"""
+               ORDER BY month, cat""",
+            params,
         ).fetchall()
 
         months_set: set[str] = set()

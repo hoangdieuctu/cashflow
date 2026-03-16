@@ -199,6 +199,17 @@
     <!-- Filters -->
     <div class="card mb-3" style="padding: 0.85rem 1.25rem;">
         <form method="get" class="row g-2 align-items-end">
+            {% if statements|length > 1 %}
+            <div class="col-md-3">
+                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statement</label>
+                <select class="form-select form-select-sm" name="statement_id" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                    <option value="">All statements</option>
+                    {% for stmt in statements %}
+                    <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>{{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:30] }} ({{ stmt.transaction_count }} txns)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="col-md-2">
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">From</label>
                 <input type="date" class="form-control form-control-sm" name="start_date" value="{{ filters.start_date }}" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
@@ -229,16 +240,16 @@
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
-                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search descriptions..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
+                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
                 </div>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem;">
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem 0.8rem;">
                     <i class="bi bi-funnel-fill me-1"></i> Filter
                 </button>
             </div>
-            <div class="col-md-1">
-                <a href="{{ url_for('main.index') }}" class="btn btn-sm w-100" style="background: #F1F5F9; color: #64748B; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem;">Clear</a>
+            <div class="col-auto">
+                <a href="{{ url_for('main.index') }}" class="btn btn-sm" style="background: #F1F5F9; color: #64748B; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem 0.8rem;">Clear</a>
             </div>
         </form>
     </div>
@@ -297,14 +308,14 @@
             <nav>
                 <ul class="pagination pagination-sm mb-0" style="gap: 4px;">
                     <li class="page-item {{ 'disabled' if page == 1 }}">
-                        <a class="page-link" href="?page={{ page - 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                        <a class="page-link" href="?page={{ page - 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
                     {% for p in range(1, total_pages + 1) %}
                     {% if p == page or (p <= 2) or (p >= total_pages - 1) or (p >= page - 1 and p <= page + 1) %}
                     <li class="page-item {{ 'active' if p == page }}">
-                        <a class="page-link" href="?page={{ p }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&search={{ filters.search }}"
+                        <a class="page-link" href="?page={{ p }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&search={{ filters.search }}"
                            style="border-radius: 6px; border: 1px solid {{ '#E4002B' if p == page else '#E2E8F0' }}; {{ 'background: var(--tcb-red); color: #fff;' if p == page else '' }} font-weight: 600; font-size: 0.78rem; min-width: 32px; text-align: center;">{{ p }}</a>
                     </li>
                     {% elif p == 3 or p == total_pages - 2 %}
@@ -312,7 +323,7 @@
                     {% endif %}
                     {% endfor %}
                     <li class="page-item {{ 'disabled' if page == total_pages }}">
-                        <a class="page-link" href="?page={{ page + 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                        <a class="page-link" href="?page={{ page + 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
@@ -326,7 +337,7 @@
             <div class="empty-icon" style="width: 60px; height: 60px; font-size: 1.5rem; border-radius: 16px; background: linear-gradient(135deg, #DBEAFE, #BFDBFE); color: #2563EB;">
                 <i class="bi bi-search"></i>
             </div>
-            {% if filters.start_date or filters.end_date or filters.type or filters.category or filters.search %}
+            {% if filters.start_date or filters.end_date or filters.type or filters.category or filters.statement_id or filters.search %}
             <h5 style="font-size: 1rem;">No matching transactions</h5>
             <p style="font-size: 0.85rem;">Try adjusting your filters.</p>
             <a href="{{ url_for('main.index') }}" class="btn btn-sm" style="background: #F1F5F9; color: var(--tcb-navy); font-weight: 600; border-radius: 8px;">Clear Filters</a>
