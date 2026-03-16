@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "techcombank-pdf"
-version = "0.1.0"
+version = "1.0.0"
 description = "Parse Techcombank credit card PDF statements"
 requires-python = ">=3.10"
 dependencies = [
