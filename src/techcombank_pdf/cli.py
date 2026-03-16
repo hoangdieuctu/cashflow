@@ -49,9 +49,8 @@ def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str
     default="excel",
 )
 @click.option("--output-dir", "-o", type=click.Path(path_type=Path), default=None)
-@click.option("--force-ocr", is_flag=True, help="Force OCR instead of text extraction")
 @click.option("--password", "-p", type=str, default=None, help="PDF password")
-def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr: bool, password: str | None):
+def parse(pdf_path: Path, output_format: str, output_dir: Path | None, password: str | None):
     """Parse a PDF statement and export results."""
     from techcombank_pdf.exporter.csv_exporter import export_csv
     from techcombank_pdf.exporter.excel_exporter import export_excel
@@ -62,7 +61,7 @@ def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = pdf_path.stem
 
-    result = parse_statement(pdf_path, force_ocr=force_ocr, password=password)
+    result = parse_statement(pdf_path, password=password)
 
     click.echo(f"Parsed {result.transaction_count} transactions ({result.parse_method})")
 
@@ -87,14 +86,13 @@ def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr
 @cli.command("import")
 @click.argument("pdf_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--db", type=click.Path(path_type=Path), default=None, help="Database path")
-@click.option("--force-ocr", is_flag=True)
 @click.option("--password", "-p", type=str, default=None, help="PDF password")
-def import_cmd(pdf_path: Path, db: Path | None, force_ocr: bool, password: str | None):
+def import_cmd(pdf_path: Path, db: Path | None, password: str | None):
     """Parse a PDF and import into the SQLite database."""
     from techcombank_pdf.database.repository import Repository
     from techcombank_pdf.parser.statement_parser import parse_statement
 
-    result = parse_statement(pdf_path, force_ocr=force_ocr, password=password)
+    result = parse_statement(pdf_path, password=password)
     click.echo(f"Parsed {result.transaction_count} transactions ({result.parse_method})")
 
     with Repository(str(db) if db else None) as repo:

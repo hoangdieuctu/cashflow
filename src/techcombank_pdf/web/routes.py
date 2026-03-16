@@ -41,9 +41,8 @@ def index():
         try:
             from techcombank_pdf.parser.statement_parser import parse_statement
 
-            force_ocr = request.form.get("force_ocr") == "on"
             password = request.form.get("password") or None
-            result = parse_statement(tmp_path, force_ocr=force_ocr, password=password)
+            result = parse_statement(tmp_path, password=password)
             result.metadata.source_file = file.filename
 
             with _get_repo() as repo:

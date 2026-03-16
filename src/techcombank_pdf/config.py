@@ -35,10 +35,6 @@ TABLE_HEADER_PATTERNS = {
     "currency": ["Loại tiền", "Currency"],
 }
 
-# OCR settings
-OCR_LANGUAGES = "vie+eng"
-OCR_DPI = 300
-
 # VND formatting: dot as thousands separator, comma as decimal (rarely used)
 VND_THOUSANDS_SEP = "."
 VND_DECIMAL_SEP = ","
