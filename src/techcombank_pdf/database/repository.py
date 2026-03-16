@@ -91,6 +91,24 @@ class Repository:
             )
 
         self.conn.commit()
+
+        # Auto-assign categories from previously categorized merchants
+        self.conn.execute(
+            """UPDATE transactions
+               SET category = (
+                   SELECT t2.category FROM transactions t2
+                   WHERE t2.merchant_name = transactions.merchant_name
+                     AND t2.category IS NOT NULL AND t2.category != ''
+                     AND t2.id != transactions.id
+                   LIMIT 1
+               )
+               WHERE statement_id = ?
+                 AND (category IS NULL OR category = '')
+                 AND merchant_name IS NOT NULL""",
+            (statement_id,),
+        )
+        self.conn.commit()
+
         return statement_id
 
     def get_transactions(
