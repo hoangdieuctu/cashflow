@@ -500,11 +500,18 @@ function cancelCategory(input) {
 }
 
 function saveCategory(input) {
+    if (input.dataset.saving) return;
+    input.dataset.saving = '1';
+
     const cell = input.closest('.category-cell');
     const txnId = cell.dataset.txnId;
     const merchant = cell.dataset.merchant;
     const category = input.value.trim();
     const display = cell.querySelector('.category-display');
+
+    // Hide edit immediately
+    cell.querySelector('.category-edit').classList.add('d-none');
+    display.classList.remove('d-none');
 
     // Always apply to all transactions with the same merchant
     const applyToMerchant = !!(merchant && category);
@@ -527,7 +534,7 @@ function saveCategory(input) {
                         d.style.color = '#0369A1';
                     }
                 });
-                showNotify(`Updated ${data.updated_count} transactions from "${merchant}"`);
+                showNotify('Updated ' + data.updated_count + ' transactions from "' + merchant + '"');
             } else {
                 display.textContent = category || '+ Add';
                 display.style.background = category ? '#F0F9FF' : '#F8FAFC';
@@ -545,10 +552,8 @@ function saveCategory(input) {
                 }
             }
         }
-    });
-
-    cell.querySelector('.category-edit').classList.add('d-none');
-    display.classList.remove('d-none');
+    })
+    .finally(() => { delete input.dataset.saving; });
 }
 
 function showNotify(msg) {
