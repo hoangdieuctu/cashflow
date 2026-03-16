@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block page_title %}Category Rules{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Add Rule -->
+    <div class="col-lg-5">
+        <div class="card" style="padding: 1.5rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 1rem;">
+                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>Add Rule
+            </h6>
+            <form id="addRuleForm">
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Match Type</label>
+                    <select class="form-select form-select-sm" id="matchType" style="border-radius: 8px; border-color: #E2E8F0;">
+                        <option value="contains">Description contains</option>
+                        <option value="endswith">Description ends with</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Pattern</label>
+                    <input type="text" class="form-control form-control-sm" id="pattern" placeholder="e.g. VINMEC, STARBUCKS..." style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
+                    <input type="text" class="form-control form-control-sm" id="category" list="categoryList" placeholder="e.g. Medical, Food..." style="border-radius: 8px; border-color: #E2E8F0;" required>
+                    <datalist id="categoryList">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Priority <span style="font-weight: 400; text-transform: none;">(higher = checked first)</span></label>
+                    <input type="number" class="form-control form-control-sm" id="priority" value="0" style="border-radius: 8px; border-color: #E2E8F0; width: 100px;">
+                </div>
+                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; padding: 0.5rem;">
+                    <i class="bi bi-plus-lg me-1"></i> Add Rule
+                </button>
+            </form>
+
+            <hr style="border-color: #F1F5F9; margin: 1.25rem 0;">
+
+            <button onclick="applyRules()" class="btn btn-sm w-100" style="background: linear-gradient(135deg, var(--tcb-red), #FF4D6D); color: #fff; border-radius: 8px; font-weight: 600; padding: 0.5rem;">
+                <i class="bi bi-lightning-fill me-1"></i> Apply Rules to All Uncategorized
+            </button>
+        </div>
+    </div>
+
+    <!-- Rules List -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-tag-fill me-2" style="color: #7C3AED;"></i>Rules <span style="font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-left: 4px;">{{ rules|length }}</span></h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table mb-0" id="rulesTable">
+                    <thead>
+                        <tr>
+                            <th>Match</th>
+                            <th>Pattern</th>
+                            <th>Category</th>
+                            <th class="text-center">Priority</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rule in rules %}
+                        <tr id="rule-{{ rule.id }}">
+                            <td>
+                                <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 5px; font-weight: 600;
+                                    {{ 'background: #EFF6FF; color: #2563EB;' if rule.match_type == 'contains' else 'background: #F5F3FF; color: #7C3AED;' }}">
+                                    {{ rule.match_type }}
+                                </span>
+                            </td>
+                            <td style="font-weight: 600; font-family: monospace; font-size: 0.85rem;">{{ rule.pattern }}</td>
+                            <td>
+                                <span style="font-size: 0.78rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; background: #F0FDF4; color: #16A34A;">
+                                    {{ rule.category }}
+                                </span>
+                            </td>
+                            <td class="text-center" style="color: #94A3B8;">{{ rule.priority }}</td>
+                            <td class="text-end">
+                                <button onclick="deleteRule({{ rule.id }})" class="btn btn-sm" style="color: #DC2626; padding: 0.15rem 0.4rem; font-size: 0.75rem;">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr id="emptyRow">
+                            <td colspan="5" class="text-center py-4" style="color: #94A3B8;">
+                                No rules defined. Add a rule to auto-categorize transactions.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('addRuleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const data = {
+        match_type: document.getElementById('matchType').value,
+        pattern: document.getElementById('pattern').value.trim(),
+        category: document.getElementById('category').value.trim(),
+        priority: parseInt(document.getElementById('priority').value) || 0,
+    };
+    if (!data.pattern || !data.category) return;
+
+    fetch('/api/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            location.reload();
+        } else {
+            showNotify(res.error || 'Failed to add rule');
+        }
+    });
+});
+
+function deleteRule(id) {
+    fetch('/api/rules/' + id, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            const row = document.getElementById('rule-' + id);
+            if (row) row.remove();
+            // Check if table is empty
+            const tbody = document.querySelector('#rulesTable tbody');
+            if (!tbody.querySelector('tr')) {
+                tbody.innerHTML = '<tr id="emptyRow"><td colspan="5" class="text-center py-4" style="color: #94A3B8;">No rules defined.</td></tr>';
+            }
+        }
+    });
+}
+
+function applyRules() {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Applying...';
+
+    fetch('/api/rules/apply', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-lightning-fill me-1"></i> Apply Rules to All Uncategorized';
+        if (res.ok) {
+            showNotify('Updated ' + res.updated + ' transaction' + (res.updated !== 1 ? 's' : ''));
+        }
+    });
+}
+
+function showNotify(msg) {
+    const el = document.createElement('div');
+    el.className = 'alert alert-info alert-dismissible fade show';
+    el.style.cssText = 'font-size:0.82rem;';
+    el.innerHTML = msg + '<button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>';
+    document.querySelector('.flash-container').appendChild(el);
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 200); }, 3000);
+}
+</script>
+{% endblock %}

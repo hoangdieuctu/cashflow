@@ -109,6 +109,9 @@ class Repository:
         )
         self.conn.commit()
 
+        # Apply category rules to remaining uncategorized
+        self.apply_rules(statement_id=statement_id)
+
         return statement_id
 
     def get_transactions(
@@ -343,6 +346,74 @@ class Repository:
             "categories": categories,
             "uncategorized": uncategorized,
         }
+
+    # ── Category Rules ──
+
+    def get_rules(self) -> list[dict[str, Any]]:
+        """Get all category rules ordered by priority (highest first)."""
+        rows = self.conn.execute(
+            "SELECT * FROM category_rules ORDER BY priority DESC, id"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def add_rule(self, match_type: str, pattern: str, category: str, priority: int = 0) -> int:
+        """Add a category rule. Returns the rule ID."""
+        cursor = self.conn.execute(
+            """INSERT OR REPLACE INTO category_rules (match_type, pattern, category, priority)
+               VALUES (?, ?, ?, ?)""",
+            (match_type, pattern.strip(), category.strip(), priority),
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def delete_rule(self, rule_id: int) -> bool:
+        """Delete a category rule. Returns True if deleted."""
+        cursor = self.conn.execute("DELETE FROM category_rules WHERE id = ?", (rule_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def apply_rules(self, statement_id: int | None = None) -> int:
+        """Apply all category rules to uncategorized transactions.
+
+        Rules are applied in priority order (highest first). Only updates
+        transactions that have no category set.
+
+        Returns the number of transactions updated.
+        """
+        rules = self.get_rules()
+        if not rules:
+            return 0
+
+        total_updated = 0
+        stmt_filter = "AND statement_id = ?" if statement_id else ""
+        stmt_params = [statement_id] if statement_id else []
+
+        for rule in rules:
+            match_type = rule["match_type"]
+            pattern = rule["pattern"]
+            category = rule["category"]
+
+            if match_type == "contains":
+                condition = "description LIKE ?"
+                param = f"%{pattern}%"
+            elif match_type == "endswith":
+                condition = "description LIKE ?"
+                param = f"%{pattern}"
+            else:
+                continue
+
+            cursor = self.conn.execute(
+                f"""UPDATE transactions
+                    SET category = ?
+                    WHERE (category IS NULL OR category = '')
+                      AND {condition}
+                      {stmt_filter}""",
+                [category, param] + stmt_params,
+            )
+            total_updated += cursor.rowcount
+
+        self.conn.commit()
+        return total_updated
 
 
 def _date_str(d: date | None) -> str | None:

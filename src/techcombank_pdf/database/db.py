@@ -46,6 +46,16 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_txn_type ON transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_txn_statement ON transactions(statement_id);
+
+CREATE TABLE IF NOT EXISTS category_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_type TEXT NOT NULL CHECK(match_type IN ('contains', 'endswith')),
+    pattern TEXT NOT NULL,
+    category TEXT NOT NULL,
+    priority INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(match_type, pattern)
+);
 """
 
 

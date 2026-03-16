@@ -225,6 +225,9 @@
             <a href="{{ url_for('main.upload') }}" class="{% if request.endpoint == 'main.upload' %}active{% endif %}">
                 <i class="bi bi-cloud-arrow-up-fill"></i> Upload
             </a>
+            <a href="{{ url_for('main.rules') }}" class="{% if request.endpoint == 'main.rules' %}active{% endif %}">
+                <i class="bi bi-tag-fill"></i> Rules
+            </a>
         </nav>
         <div class="sidebar-footer">
             Techcombank PDF Parser v0.1

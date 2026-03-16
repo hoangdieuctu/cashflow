@@ -142,6 +142,55 @@ def upload():
     return redirect(url_for("main.index"))
 
 
+@bp.route("/rules", methods=["GET"])
+def rules():
+    """Category rules management page."""
+    with _get_repo() as repo:
+        all_rules = repo.get_rules()
+        categories = repo.get_all_categories()
+    return render_template("rules.html", rules=all_rules, categories=categories)
+
+
+@bp.route("/api/rules", methods=["POST"])
+def add_rule():
+    """Add a new category rule."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    match_type = data.get("match_type", "").strip()
+    pattern = data.get("pattern", "").strip()
+    category = data.get("category", "").strip()
+    priority = int(data.get("priority", 0))
+
+    if match_type not in ("contains", "endswith"):
+        return jsonify({"error": "match_type must be 'contains' or 'endswith'"}), 400
+    if not pattern or not category:
+        return jsonify({"error": "pattern and category are required"}), 400
+
+    with _get_repo() as repo:
+        rule_id = repo.add_rule(match_type, pattern, category, priority)
+    return jsonify({"ok": True, "id": rule_id})
+
+
+@bp.route("/api/rules/<int:rule_id>", methods=["DELETE"])
+def delete_rule(rule_id: int):
+    """Delete a category rule."""
+    with _get_repo() as repo:
+        ok = repo.delete_rule(rule_id)
+    if not ok:
+        return jsonify({"error": "Rule not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/rules/apply", methods=["POST"])
+def apply_rules():
+    """Apply all rules to uncategorized transactions."""
+    with _get_repo() as repo:
+        count = repo.apply_rules()
+    return jsonify({"ok": True, "updated": count})
+
+
 @bp.route("/api/summary")
 def api_summary():
     """API endpoint for dashboard chart data."""
