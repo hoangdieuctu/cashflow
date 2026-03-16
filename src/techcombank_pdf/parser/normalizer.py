@@ -46,8 +46,14 @@ def parse_vnd_amount(text: str) -> Decimal | None:
             cleaned = cleaned.replace(".", "")
         # else keep as-is (decimal point)
     elif "," in cleaned:
-        # Comma as decimal separator
-        cleaned = cleaned.replace(",", ".")
+        # Could be thousands separator (1,234,567) or decimal (1234,56)
+        parts = cleaned.split(",")
+        if all(len(p) == 3 for p in parts[1:]):
+            # All parts after first have 3 digits → thousands separator
+            cleaned = cleaned.replace(",", "")
+        else:
+            # Single comma as decimal separator
+            cleaned = cleaned.replace(",", ".")
 
     try:
         amount = Decimal(cleaned)

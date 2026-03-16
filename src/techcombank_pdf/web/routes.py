@@ -45,6 +45,15 @@ def index():
             result = parse_statement(tmp_path, password=password)
             result.metadata.source_file = file.filename
 
+            if result.transaction_count == 0:
+                flash(
+                    f"No transactions found in {file.filename}. "
+                    "The PDF may be password-protected (enter the password above) "
+                    "or the statement format is not yet supported.",
+                    "warning",
+                )
+                return redirect(url_for("main.index"))
+
             with _get_repo() as repo:
                 repo.import_parse_result(result)
 
