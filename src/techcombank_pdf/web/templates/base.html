@@ -238,11 +238,9 @@
                 <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('show')">
                     <i class="bi bi-list"></i>
                 </button>
-                <h1>Dashboard</h1>
+                <h1>{% block page_title %}Dashboard{% endblock %}</h1>
             </div>
-            <span style="font-size: 0.8rem; color: #64748B; font-weight: 500;">
-                {{ total }} transaction{{ 's' if total != 1 }}
-            </span>
+            <div>{% block topbar_right %}{% endblock %}</div>
         </header>
 
         <!-- Flash messages -->

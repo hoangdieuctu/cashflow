@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block topbar_right %}<span style="font-size: 0.8rem; color: #64748B; font-weight: 500;">{{ total }} transaction{{ 's' if total != 1 }}</span>{% endblock %}
 
 {% block content %}
 {% if not statements %}
