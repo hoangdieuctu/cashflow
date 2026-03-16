@@ -1,190 +1,308 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Techcombank Parser{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-{% if summary.total_transactions == 0 %}
-<!-- ── Welcome / Empty State ── -->
-<div class="card" style="margin-top: 2rem;">
-    <div class="empty-state" style="padding: 4rem 2rem;">
-        <div class="empty-icon">
-            <i class="bi bi-credit-card-2-front"></i>
-        </div>
-        <h5>Welcome to Techcombank Parser</h5>
-        <p>Upload your first credit card statement to see spending analytics, charts, and detailed transaction history.</p>
-        <a href="{{ url_for('main.upload') }}" class="btn btn-danger px-4 py-2" style="border-radius: 10px; font-weight: 600;">
-            <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Statement
-        </a>
-        <div class="mt-4 d-flex justify-content-center gap-4" style="color: #94A3B8; font-size: 0.8rem;">
-            <span><i class="bi bi-filetype-pdf me-1"></i>PDF parsing</span>
-            <span><i class="bi bi-bar-chart me-1"></i>Analytics</span>
-            <span><i class="bi bi-download me-1"></i>Excel / CSV / JSON</span>
-        </div>
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION: Upload                                -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="section-upload" class="mb-4">
+    <div class="section-title">Upload Statement</div>
+    <div class="card" style="padding: 1.25rem;">
+        <form method="post" enctype="multipart/form-data" id="uploadForm" class="row g-3 align-items-center">
+            <div class="col-lg-7">
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="up-icon" id="uploadIcon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+                    <h6 id="uploadTitle">Drop PDF here or click to browse</h6>
+                    <p id="uploadHint">Techcombank credit card statement</p>
+                    <div class="file-tag d-none" id="fileTag">
+                        <i class="bi bi-file-earmark-pdf-fill" style="color: var(--tcb-red);"></i>
+                        <span id="fileName"></span>
+                    </div>
+                </div>
+                <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
+            </div>
+            <div class="col-lg-5 d-flex flex-column gap-2">
+                <div class="form-check m-0">
+                    <input class="form-check-input" type="checkbox" name="force_ocr" id="forceOcr">
+                    <label class="form-check-label" for="forceOcr" style="font-size: 0.82rem; color: #64748B;">
+                        Force OCR <span style="color: #94A3B8;">(for scanned PDFs)</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn upload-btn" id="submitBtn" disabled>
+                    <i class="bi bi-lightning-fill me-1"></i> Parse & Import
+                </button>
+                <div class="d-flex gap-3 justify-content-center" style="color: #94A3B8; font-size: 0.72rem;">
+                    <span><i class="bi bi-shield-check me-1"></i>Text + OCR</span>
+                    <span><i class="bi bi-translate me-1"></i>Vietnamese</span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if summary.total_transactions == 0 and not transactions %}
+<!-- ══════════════════════════════════════════════ -->
+<!-- Empty state                                    -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="card" style="margin-top: 1rem;">
+    <div class="empty-state" style="padding: 3.5rem 2rem;">
+        <div class="empty-icon"><i class="bi bi-credit-card-2-front"></i></div>
+        <h5>No statements imported yet</h5>
+        <p>Upload your first Techcombank credit card statement above to see spending analytics and transaction history.</p>
     </div>
 </div>
 
 {% else %}
-<!-- ── Stats Row ── -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
-        <div class="stat-card">
-            <div class="d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-label">Total Transactions</div>
-                    <div class="stat-value">{{ "{:,}".format(summary.total_transactions) }}</div>
-                    <div class="stat-sub">{{ statements|length }} statement{{ 's' if statements|length != 1 }}</div>
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION: Overview (stats + charts)             -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="section-overview" class="mb-4">
+    <div class="section-title">Overview</div>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="stat-label">Transactions</div>
+                        <div class="stat-value">{{ "{:,}".format(summary.total_transactions) }}</div>
+                        <div class="stat-sub">{{ statements|length }} statement{{ 's' if statements|length != 1 }}</div>
+                    </div>
+                    <div class="stat-icon blue"><i class="bi bi-receipt"></i></div>
                 </div>
-                <div class="stat-icon blue"><i class="bi bi-receipt"></i></div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="stat-label">Total Spending</div>
+                        <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit) }}</div>
+                        <div class="stat-sub">VND</div>
+                    </div>
+                    <div class="stat-icon red"><i class="bi bi-arrow-down-circle"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="stat-label">Credits</div>
+                        <div class="stat-value">{{ "{:,.0f}".format(summary.total_credit) }}</div>
+                        <div class="stat-sub">VND</div>
+                    </div>
+                    <div class="stat-icon green"><i class="bi bi-arrow-up-circle"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="stat-label">Net Spend</div>
+                        <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit - summary.total_credit) }}</div>
+                        <div class="stat-sub">VND</div>
+                    </div>
+                    <div class="stat-icon amber"><i class="bi bi-wallet2"></i></div>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-6 col-lg-3">
-        <div class="stat-card">
-            <div class="d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-label">Total Spending</div>
-                    <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit) }}</div>
-                    <div class="stat-sub">VND (debit)</div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-bar-chart-fill me-2" style="color: var(--tcb-red);"></i>Monthly Spending</h6>
                 </div>
-                <div class="stat-icon red"><i class="bi bi-arrow-down-circle"></i></div>
+                <div style="padding: 1rem 1.25rem;">
+                    <canvas id="monthlyChart" height="280"></canvas>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-6 col-lg-3">
-        <div class="stat-card">
-            <div class="d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-label">Total Credits</div>
-                    <div class="stat-value">{{ "{:,.0f}".format(summary.total_credit) }}</div>
-                    <div class="stat-sub">VND (refunds/payments)</div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-pie-chart-fill me-2" style="color: #2563EB;"></i>Debit vs Credit</h6>
                 </div>
-                <div class="stat-icon green"><i class="bi bi-arrow-up-circle"></i></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-lg-3">
-        <div class="stat-card">
-            <div class="d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-label">Net Spend</div>
-                    <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit - summary.total_credit) }}</div>
-                    <div class="stat-sub">VND</div>
+                <div style="padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: center;">
+                    <canvas id="typeChart" height="220"></canvas>
                 </div>
-                <div class="stat-icon amber"><i class="bi bi-wallet2"></i></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ── Charts Row ── -->
-<div class="row g-3 mb-4">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header-custom">
-                <h6><i class="bi bi-bar-chart-fill me-2" style="color: var(--tcb-red);"></i>Monthly Spending</h6>
-            </div>
-            <div style="padding: 1rem 1.25rem;">
-                <canvas id="monthlyChart" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header-custom">
-                <h6><i class="bi bi-pie-chart-fill me-2" style="color: #2563EB;"></i>Debit vs Credit</h6>
-            </div>
-            <div style="padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: center;">
-                <canvas id="typeChart" height="240"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION: Transactions (filters + table)        -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="section-transactions">
+    <div class="section-title">Transactions</div>
 
-<!-- ── Recent Transactions ── -->
-<div class="card mb-4">
-    <div class="card-header-custom">
-        <h6><i class="bi bi-clock-history me-2" style="color: #D97706;"></i>Recent Transactions</h6>
-        <a href="{{ url_for('main.transactions') }}" class="btn btn-sm" style="background: #F1F5F9; color: var(--tcb-navy); font-size: 0.78rem; font-weight: 600; border-radius: 8px;">
-            View All <i class="bi bi-arrow-right ms-1"></i>
-        </a>
+    <!-- Filters -->
+    <div class="card mb-3" style="padding: 0.85rem 1.25rem;">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">From</label>
+                <input type="date" class="form-control form-control-sm" name="start_date" value="{{ filters.start_date }}" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">To</label>
+                <input type="date" class="form-control form-control-sm" name="end_date" value="{{ filters.end_date }}" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Type</label>
+                <select class="form-select form-select-sm" name="type" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                    <option value="">All</option>
+                    <option value="debit" {{ 'selected' if filters.type == 'debit' }}>Debit</option>
+                    <option value="credit" {{ 'selected' if filters.type == 'credit' }}>Credit</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
+                    <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="Search descriptions..." style="border-radius: 0 8px 8px 0; border-color: #E2E8F0; font-size: 0.82rem;">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem;">
+                    <i class="bi bi-funnel-fill me-1"></i> Filter
+                </button>
+            </div>
+            <div class="col-md-1">
+                <a href="{{ url_for('main.index') }}" class="btn btn-sm w-100" style="background: #F1F5F9; color: #64748B; border-radius: 8px; font-weight: 600; font-size: 0.82rem; padding: 0.4rem;">Clear</a>
+            </div>
+        </form>
     </div>
-    <div class="table-responsive">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th class="text-end">Amount (VND)</th>
-                    <th class="text-center">Type</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for txn in recent_transactions %}
-                <tr>
-                    <td class="text-nowrap">{{ txn.transaction_date }}</td>
-                    <td style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ txn.description }}</td>
-                    <td class="text-end amount-{{ txn.transaction_type }}">
-                        {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
-                    </td>
-                    <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
 
-<!-- ── Imported Statements ── -->
-{% if statements %}
-<div class="card">
-    <div class="card-header-custom">
-        <h6><i class="bi bi-file-earmark-pdf-fill me-2" style="color: var(--tcb-red);"></i>Imported Statements</h6>
-    </div>
-    <div class="table-responsive">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>File</th>
-                    <th>Statement Date</th>
-                    <th class="text-center">Transactions</th>
-                    <th class="text-center">Method</th>
-                    <th>Imported</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for stmt in statements %}
-                <tr>
-                    <td>
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-file-earmark-pdf" style="color: var(--tcb-red); font-size: 1.1rem;"></i>
-                            {{ stmt.source_file }}
-                        </div>
-                    </td>
-                    <td>{{ stmt.statement_date or '-' }}</td>
-                    <td class="text-center fw-semibold">{{ stmt.transaction_count }}</td>
-                    <td class="text-center"><span class="badge-method">{{ stmt.parse_method }}</span></td>
-                    <td class="text-muted" style="font-size: 0.8rem;">{{ stmt.imported_at }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Table -->
+    <div class="card">
+        {% if transactions %}
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Posting</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount (VND)</th>
+                        <th class="text-center">Type</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for txn in transactions %}
+                    <tr>
+                        <td class="text-nowrap fw-medium">{{ txn.transaction_date }}</td>
+                        <td class="text-nowrap" style="color: #94A3B8;">{{ txn.posting_date or '-' }}</td>
+                        <td style="max-width: 350px;">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ txn.description }}">{{ txn.description }}</div>
+                        </td>
+                        <td class="text-end amount-{{ txn.transaction_type }}">
+                            {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
+                        </td>
+                        <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
+                        <td style="font-size: 0.75rem; color: #94A3B8; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ txn.source_file }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.78rem; color: #94A3B8;">Page {{ page }} of {{ total_pages }}</span>
+            <nav>
+                <ul class="pagination pagination-sm mb-0" style="gap: 4px;">
+                    <li class="page-item {{ 'disabled' if page == 1 }}">
+                        <a class="page-link" href="?page={{ page - 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% for p in range(1, total_pages + 1) %}
+                    {% if p == page or (p <= 2) or (p >= total_pages - 1) or (p >= page - 1 and p <= page + 1) %}
+                    <li class="page-item {{ 'active' if p == page }}">
+                        <a class="page-link" href="?page={{ p }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&search={{ filters.search }}"
+                           style="border-radius: 6px; border: 1px solid {{ '#E4002B' if p == page else '#E2E8F0' }}; {{ 'background: var(--tcb-red); color: #fff;' if p == page else '' }} font-weight: 600; font-size: 0.78rem; min-width: 32px; text-align: center;">{{ p }}</a>
+                    </li>
+                    {% elif p == 3 or p == total_pages - 2 %}
+                    <li class="page-item disabled"><span class="page-link" style="border: none; color: #94A3B8;">...</span></li>
+                    {% endif %}
+                    {% endfor %}
+                    <li class="page-item {{ 'disabled' if page == total_pages }}">
+                        <a class="page-link" href="?page={{ page + 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state" style="padding: 2.5rem;">
+            <div class="empty-icon" style="width: 60px; height: 60px; font-size: 1.5rem; border-radius: 16px; background: linear-gradient(135deg, #DBEAFE, #BFDBFE); color: #2563EB;">
+                <i class="bi bi-search"></i>
+            </div>
+            {% if filters.start_date or filters.end_date or filters.type or filters.search %}
+            <h5 style="font-size: 1rem;">No matching transactions</h5>
+            <p style="font-size: 0.85rem;">Try adjusting your filters.</p>
+            <a href="{{ url_for('main.index') }}" class="btn btn-sm" style="background: #F1F5F9; color: var(--tcb-navy); font-weight: 600; border-radius: 8px;">Clear Filters</a>
+            {% else %}
+            <h5 style="font-size: 1rem;">No transactions yet</h5>
+            <p style="font-size: 0.85rem;">Upload a statement above to get started.</p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
-{% endif %}
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
+<!-- Upload JS -->
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileTag = document.getElementById('fileTag');
+const fileNameSpan = document.getElementById('fileName');
+const uploadTitle = document.getElementById('uploadTitle');
+const uploadHint = document.getElementById('uploadHint');
+const uploadIcon = document.getElementById('uploadIcon');
+const submitBtn = document.getElementById('submitBtn');
+
+function setFile(file) {
+    fileNameSpan.textContent = file.name;
+    fileTag.classList.remove('d-none');
+    uploadTitle.textContent = 'File selected';
+    uploadHint.textContent = 'Click to change';
+    uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
+    dropZone.classList.add('has-file');
+    submitBtn.disabled = false;
+}
+fileInput.addEventListener('change', function() { if (this.files.length) setFile(this.files[0]); });
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
+dropZone.addEventListener('drop', ev => {
+    const f = ev.dataTransfer.files;
+    if (f.length && f[0].name.toLowerCase().endsWith('.pdf')) { fileInput.files = f; setFile(f[0]); }
+});
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Parsing...';
+});
+</script>
+
 {% if summary.total_transactions > 0 %}
+<!-- Charts JS -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
-
     const monthlyData = {{ summary.monthly | tojson }};
 
     if (monthlyData.length > 0) {
-        const ctx1 = document.getElementById('monthlyChart');
-        new Chart(ctx1, {
+        new Chart(document.getElementById('monthlyChart'), {
             type: 'bar',
             data: {
                 labels: monthlyData.map(m => {
@@ -194,79 +312,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: 'Spending',
                     data: monthlyData.map(m => m.spending),
-                    backgroundColor: monthlyData.map((_, i) => {
-                        const colors = ['#E4002B', '#FF4D6D', '#FF758F', '#E4002B', '#FF4D6D', '#FF758F'];
-                        return colors[i % colors.length];
-                    }),
-                    borderRadius: 8,
-                    borderSkipped: false,
-                    maxBarThickness: 48,
+                    backgroundColor: monthlyData.map((_, i) => ['#E4002B','#FF4D6D','#FF758F'][i % 3]),
+                    borderRadius: 8, borderSkipped: false, maxBarThickness: 48,
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#0F172A',
-                        titleFont: { weight: '600' },
-                        padding: 12,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: ctx => new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND'
-                        }
+                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
+                        callbacks: { label: ctx => new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
                     }
                 },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#F1F5F9' },
-                        border: { display: false },
-                        ticks: {
-                            color: '#94A3B8', font: { size: 11, weight: '500' },
-                            callback: v => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : (v / 1000).toFixed(0) + 'K'
-                        }
-                    },
-                    x: {
-                        grid: { display: false },
-                        border: { display: false },
-                        ticks: { color: '#94A3B8', font: { size: 11, weight: '500' } }
-                    }
+                    y: { beginAtZero: true, grid: { color: '#F1F5F9' }, border: { display: false },
+                         ticks: { color: '#94A3B8', font: { size: 11 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K' }},
+                    x: { grid: { display: false }, border: { display: false }, ticks: { color: '#94A3B8', font: { size: 11 } }}
                 }
             }
         });
     }
 
-    const debit = {{ summary.total_debit }};
-    const credit = {{ summary.total_credit }};
+    const debit = {{ summary.total_debit }}, credit = {{ summary.total_credit }};
     if (debit > 0 || credit > 0) {
         new Chart(document.getElementById('typeChart'), {
             type: 'doughnut',
             data: {
                 labels: ['Debit', 'Credit'],
-                datasets: [{
-                    data: [debit, credit],
-                    backgroundColor: ['#E4002B', '#16A34A'],
-                    borderWidth: 0,
-                    spacing: 4,
-                }]
+                datasets: [{ data: [debit, credit], backgroundColor: ['#E4002B','#16A34A'], borderWidth: 0, spacing: 4 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '72%',
+                responsive: true, maintainAspectRatio: false, cutout: '72%',
                 plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } }
-                    },
-                    tooltip: {
-                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
-                        callbacks: {
-                            label: ctx => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed) + ' VND'
-                        }
-                    }
+                    legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } }},
+                    tooltip: { backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
+                        callbacks: { label: ctx => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed) + ' VND' }}
                 }
             }
         });
