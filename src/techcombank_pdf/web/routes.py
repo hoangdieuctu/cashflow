@@ -109,6 +109,18 @@ def upload():
             return redirect(url_for("main.upload"))
 
         with _get_repo() as repo:
+            # Check if this statement was already imported
+            existing = repo.conn.execute(
+                "SELECT id FROM statements WHERE source_file = ?",
+                (file.filename,),
+            ).fetchone()
+            if existing:
+                flash(
+                    f"{file.filename} has already been imported.",
+                    "error",
+                )
+                return redirect(url_for("main.upload"))
+
             repo.import_parse_result(result)
 
         flash(
