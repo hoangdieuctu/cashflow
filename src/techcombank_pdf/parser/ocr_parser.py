@@ -97,7 +97,7 @@ def _parse_ocr_text(text: str) -> list[Transaction]:
     return transactions
 
 
-def parse_ocr_pdf(pdf_path: str | Path) -> ParseResult:
+def parse_ocr_pdf(pdf_path: str | Path, password: str | None = None) -> ParseResult:
     """Parse a scanned PDF statement using OCR.
 
     Converts pages to images, preprocesses, and runs pytesseract.
@@ -107,7 +107,7 @@ def parse_ocr_pdf(pdf_path: str | Path) -> ParseResult:
     warnings: list[str] = []
 
     # Convert PDF to images
-    image_paths = convert_pdf_to_images(pdf_path, dpi=OCR_DPI)
+    image_paths = convert_pdf_to_images(pdf_path, dpi=OCR_DPI, password=password)
 
     for page_num, image_path in enumerate(image_paths):
         try:

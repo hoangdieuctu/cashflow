@@ -88,7 +88,7 @@ def _extract_metadata_from_text(full_text: str) -> StatementMetadata:
     return meta
 
 
-def parse_text_pdf(pdf_path: str | Path) -> ParseResult:
+def parse_text_pdf(pdf_path: str | Path, password: str | None = None) -> ParseResult:
     """Parse a text-based Techcombank PDF statement using pdfplumber.
 
     Returns a ParseResult with extracted transactions and metadata.
@@ -98,7 +98,7 @@ def parse_text_pdf(pdf_path: str | Path) -> ParseResult:
     warnings: list[str] = []
     full_text_parts: list[str] = []
 
-    with pdfplumber.open(str(pdf_path)) as pdf:
+    with pdfplumber.open(str(pdf_path), password=password) as pdf:
         page_count = len(pdf.pages)
 
         for page_num, page in enumerate(pdf.pages):

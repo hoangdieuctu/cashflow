@@ -15,6 +15,7 @@ def convert_pdf_to_images(
     dpi: int = DEFAULT_DPI,
     image_format: str = DEFAULT_IMAGE_FORMAT,
     pages: list[int] | None = None,
+    password: str | None = None,
 ) -> list[Path]:
     """Convert PDF pages to images.
 
@@ -24,6 +25,7 @@ def convert_pdf_to_images(
         dpi: Resolution in dots per inch.
         image_format: Output format ('png' or 'jpeg').
         pages: Specific page numbers (0-indexed) to convert. None = all pages.
+        password: Password for encrypted PDFs.
 
     Returns:
         List of paths to generated image files.
@@ -40,6 +42,10 @@ def convert_pdf_to_images(
 
     image_paths: list[Path] = []
     doc = fitz.open(str(pdf_path))
+    if password and doc.is_encrypted:
+        if not doc.authenticate(password):
+            doc.close()
+            raise ValueError("Invalid PDF password")
 
     try:
         page_range = pages if pages is not None else range(doc.page_count)

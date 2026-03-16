@@ -23,7 +23,8 @@ def cli():
 @click.option("--dpi", type=int, default=300)
 @click.option("--format", "image_format", type=click.Choice(["png", "jpeg"]), default="png")
 @click.option("--pages", type=str, default=None, help="Page numbers (comma-separated, 1-indexed)")
-def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str, pages: str | None):
+@click.option("--password", "-p", type=str, default=None, help="PDF password")
+def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str, pages: str | None, password: str | None):
     """Convert PDF pages to images."""
     from techcombank_pdf.converter.pdf_to_image import convert_pdf_to_images
 
@@ -32,7 +33,7 @@ def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str
         page_list = [int(p.strip()) - 1 for p in pages.split(",")]
 
     image_paths = convert_pdf_to_images(
-        pdf_path, output_dir=output_dir, dpi=dpi, image_format=image_format, pages=page_list
+        pdf_path, output_dir=output_dir, dpi=dpi, image_format=image_format, pages=page_list, password=password
     )
 
     click.echo(f"Converted {len(image_paths)} pages:")
@@ -49,7 +50,8 @@ def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str
 )
 @click.option("--output-dir", "-o", type=click.Path(path_type=Path), default=None)
 @click.option("--force-ocr", is_flag=True, help="Force OCR instead of text extraction")
-def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr: bool):
+@click.option("--password", "-p", type=str, default=None, help="PDF password")
+def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr: bool, password: str | None):
     """Parse a PDF statement and export results."""
     from techcombank_pdf.exporter.csv_exporter import export_csv
     from techcombank_pdf.exporter.excel_exporter import export_excel
@@ -60,7 +62,7 @@ def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = pdf_path.stem
 
-    result = parse_statement(pdf_path, force_ocr=force_ocr)
+    result = parse_statement(pdf_path, force_ocr=force_ocr, password=password)
 
     click.echo(f"Parsed {result.transaction_count} transactions ({result.parse_method})")
 
@@ -86,12 +88,13 @@ def parse(pdf_path: Path, output_format: str, output_dir: Path | None, force_ocr
 @click.argument("pdf_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--db", type=click.Path(path_type=Path), default=None, help="Database path")
 @click.option("--force-ocr", is_flag=True)
-def import_cmd(pdf_path: Path, db: Path | None, force_ocr: bool):
+@click.option("--password", "-p", type=str, default=None, help="PDF password")
+def import_cmd(pdf_path: Path, db: Path | None, force_ocr: bool, password: str | None):
     """Parse a PDF and import into the SQLite database."""
     from techcombank_pdf.database.repository import Repository
     from techcombank_pdf.parser.statement_parser import parse_statement
 
-    result = parse_statement(pdf_path, force_ocr=force_ocr)
+    result = parse_statement(pdf_path, force_ocr=force_ocr, password=password)
     click.echo(f"Parsed {result.transaction_count} transactions ({result.parse_method})")
 
     with Repository(str(db) if db else None) as repo:

@@ -16,6 +16,7 @@ def parse_statement(
     pdf_path: str | Path,
     force_ocr: bool = False,
     min_transactions: int = 1,
+    password: str | None = None,
 ) -> ParseResult:
     """Parse a Techcombank credit card statement.
 
@@ -29,6 +30,7 @@ def parse_statement(
         force_ocr: Skip text extraction and use OCR directly.
         min_transactions: Minimum transactions expected from text extraction
                          before falling back to OCR.
+        password: Password for encrypted PDFs.
 
     Returns:
         ParseResult with transactions and metadata.
@@ -39,11 +41,11 @@ def parse_statement(
 
     if force_ocr:
         logger.info("Forced OCR mode for %s", pdf_path.name)
-        return parse_ocr_pdf(pdf_path)
+        return parse_ocr_pdf(pdf_path, password=password)
 
     # Try text extraction first
     logger.info("Attempting text extraction for %s", pdf_path.name)
-    result = parse_text_pdf(pdf_path)
+    result = parse_text_pdf(pdf_path, password=password)
 
     if result.transaction_count >= min_transactions:
         logger.info(
@@ -56,7 +58,7 @@ def parse_statement(
         "Text extraction found only %d transactions, falling back to OCR",
         result.transaction_count,
     )
-    ocr_result = parse_ocr_pdf(pdf_path)
+    ocr_result = parse_ocr_pdf(pdf_path, password=password)
 
     if ocr_result.transaction_count > result.transaction_count:
         ocr_result.parse_method = "ocr"
