@@ -186,6 +186,18 @@ class Repository:
         self.conn.commit()
         return cursor.rowcount > 0
 
+    def update_category_by_merchant(self, merchant_name: str, category: str | None) -> int:
+        """Update category for all transactions with the same merchant_name.
+
+        Returns the number of rows updated.
+        """
+        cursor = self.conn.execute(
+            "UPDATE transactions SET category = ? WHERE merchant_name = ?",
+            (category or None, merchant_name),
+        )
+        self.conn.commit()
+        return cursor.rowcount
+
     def get_all_categories(self) -> list[str]:
         """Get all distinct non-null categories."""
         rows = self.conn.execute(

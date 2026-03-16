@@ -259,7 +259,7 @@
                         </td>
                         <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
                         <td style="min-width: 140px;">
-                            <div class="category-cell" data-txn-id="{{ txn.id }}">
+                            <div class="category-cell" data-txn-id="{{ txn.id }}" data-merchant="{{ txn.merchant_name or '' }}">
                                 <span class="category-display" onclick="editCategory(this)" style="cursor: pointer; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 6px; {{ 'background: #F0F9FF; color: #0369A1;' if txn.category else 'background: #F8FAFC; color: #CBD5E1;' }}">
                                     {{ txn.category or '+ Add' }}
                                 </span>
@@ -502,20 +502,44 @@ function cancelCategory(input) {
 function saveCategory(input) {
     const cell = input.closest('.category-cell');
     const txnId = cell.dataset.txnId;
+    const merchant = cell.dataset.merchant;
     const category = input.value.trim();
     const display = cell.querySelector('.category-display');
+
+    // Count how many other rows share this merchant
+    let matchCount = 0;
+    if (merchant && category) {
+        document.querySelectorAll('.category-cell').forEach(c => {
+            if (c.dataset.merchant === merchant && c.dataset.txnId !== txnId) matchCount++;
+        });
+    }
+
+    const applyToMerchant = matchCount > 0 && category &&
+        confirm(`Apply "${category}" to all ${matchCount + 1} transactions from "${merchant}"?`);
 
     fetch('/api/transaction/' + txnId + '/category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: category })
+        body: JSON.stringify({ category: category, apply_to_merchant: applyToMerchant })
     })
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            display.textContent = category || '+ Add';
-            display.style.background = category ? '#F0F9FF' : '#F8FAFC';
-            display.style.color = category ? '#0369A1' : '#CBD5E1';
+            if (applyToMerchant) {
+                // Update all matching merchant cells on the page
+                document.querySelectorAll('.category-cell').forEach(c => {
+                    if (c.dataset.merchant === merchant) {
+                        const d = c.querySelector('.category-display');
+                        d.textContent = category;
+                        d.style.background = '#F0F9FF';
+                        d.style.color = '#0369A1';
+                    }
+                });
+            } else {
+                display.textContent = category || '+ Add';
+                display.style.background = category ? '#F0F9FF' : '#F8FAFC';
+                display.style.color = category ? '#0369A1' : '#CBD5E1';
+            }
             // Add to datalist if new
             if (category) {
                 const dl = document.getElementById('categoryList');

@@ -154,11 +154,22 @@ def update_category(txn_id: int):
         return jsonify({"error": "JSON body required"}), 400
 
     category = (data.get("category") or "").strip() or None
+    apply_to_merchant = data.get("apply_to_merchant", False)
 
     with _get_repo() as repo:
         ok = repo.update_transaction_category(txn_id, category)
+        if not ok:
+            return jsonify({"error": "Transaction not found"}), 404
 
-    if not ok:
-        return jsonify({"error": "Transaction not found"}), 404
+        updated_count = 1
+        if apply_to_merchant and category:
+            # Get the merchant_name of this transaction
+            row = repo.conn.execute(
+                "SELECT merchant_name FROM transactions WHERE id = ?", (txn_id,)
+            ).fetchone()
+            if row and row["merchant_name"]:
+                updated_count = repo.update_category_by_merchant(
+                    row["merchant_name"], category
+                )
 
-    return jsonify({"ok": True, "category": category})
+    return jsonify({"ok": True, "category": category, "updated_count": updated_count})
