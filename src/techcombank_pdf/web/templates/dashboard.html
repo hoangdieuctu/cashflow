@@ -210,23 +210,7 @@
                 </select>
             </div>
             {% endif %}
-            <div class="col-md-2">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">From</label>
-                <input type="date" class="form-control form-control-sm" name="start_date" value="{{ filters.start_date }}" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">To</label>
-                <input type="date" class="form-control form-control-sm" name="end_date" value="{{ filters.end_date }}" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Type</label>
-                <select class="form-select form-select-sm" name="type" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-                    <option value="">All</option>
-                    <option value="debit" {{ 'selected' if filters.type == 'debit' }}>Debit</option>
-                    <option value="credit" {{ 'selected' if filters.type == 'credit' }}>Credit</option>
-                </select>
-            </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
                 <select class="form-select form-select-sm" name="category" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                     <option value="">All</option>
@@ -236,7 +220,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Search</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;"><i class="bi bi-search" style="color: #94A3B8; font-size: 0.8rem;"></i></span>
