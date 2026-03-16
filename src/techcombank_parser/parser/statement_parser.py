@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from techcombank_pdf.models.transaction import ParseResult
-from techcombank_pdf.parser.text_parser import parse_text_pdf
+from techcombank_parser.models.transaction import ParseResult
+from techcombank_parser.parser.text_parser import parse_text_pdf
 
 logger = logging.getLogger(__name__)
 

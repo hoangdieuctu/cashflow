@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from techcombank_pdf.config import DATABASE_PATH
+from techcombank_parser.config import DATABASE_PATH
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS statements (

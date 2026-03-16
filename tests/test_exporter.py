@@ -4,9 +4,9 @@ import csv
 import json
 from pathlib import Path
 
-from techcombank_pdf.exporter.csv_exporter import export_csv
-from techcombank_pdf.exporter.excel_exporter import export_excel
-from techcombank_pdf.exporter.json_exporter import export_json
+from techcombank_parser.exporter.csv_exporter import export_csv
+from techcombank_parser.exporter.excel_exporter import export_excel
+from techcombank_parser.exporter.json_exporter import export_json
 
 
 class TestExcelExporter:

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from techcombank_pdf.converter.pdf_to_image import convert_pdf_to_images, get_page_count
+from techcombank_parser.converter.pdf_to_image import convert_pdf_to_images, get_page_count
 
 
 class TestConvertPdfToImages:
@@ -14,7 +14,7 @@ class TestConvertPdfToImages:
         with pytest.raises(FileNotFoundError):
             convert_pdf_to_images(tmp_dir / "nonexistent.pdf")
 
-    @patch("techcombank_pdf.converter.pdf_to_image.fitz")
+    @patch("techcombank_parser.converter.pdf_to_image.fitz")
     def test_converts_all_pages(self, mock_fitz, tmp_dir):
         # Mock PDF document
         mock_doc = MagicMock()
@@ -36,7 +36,7 @@ class TestConvertPdfToImages:
         assert len(result) == 3
         assert mock_pix.save.call_count == 3
 
-    @patch("techcombank_pdf.converter.pdf_to_image.fitz")
+    @patch("techcombank_parser.converter.pdf_to_image.fitz")
     def test_specific_pages(self, mock_fitz, tmp_dir):
         mock_doc = MagicMock()
         mock_doc.page_count = 5

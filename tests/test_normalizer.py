@@ -3,7 +3,7 @@
 from datetime import date
 from decimal import Decimal
 
-from techcombank_pdf.parser.normalizer import (
+from techcombank_parser.parser.normalizer import (
     detect_transaction_type,
     normalize_vietnamese_text,
     parse_date,

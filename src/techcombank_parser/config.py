@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-# Project root is two levels up from this file (src/techcombank_pdf/config.py)
+# Project root is two levels up from this file (src/techcombank_parser/config.py)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Data directories

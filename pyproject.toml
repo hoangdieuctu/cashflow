@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "techcombank-pdf"
-version = "1.0.0"
+name = "techcombank-parser"
+version = "1.0.1"
 description = "Parse Techcombank credit card PDF statements"
 requires-python = ">=3.10"
 dependencies = [
@@ -24,7 +24,7 @@ dev = [
 ]
 
 [project.scripts]
-techcombank-pdf = "techcombank_pdf.cli:cli"
+techcombank-parser = "techcombank_parser.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]

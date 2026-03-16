@@ -6,7 +6,7 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from techcombank_pdf.config import DEFAULT_DPI, DEFAULT_IMAGE_FORMAT, OUTPUT_DIR
+from techcombank_parser.config import DEFAULT_DPI, DEFAULT_IMAGE_FORMAT, OUTPUT_DIR
 
 
 def convert_pdf_to_images(

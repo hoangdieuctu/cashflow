@@ -5,9 +5,9 @@ from decimal import Decimal
 
 import pytest
 
-from techcombank_pdf.database.db import init_db
-from techcombank_pdf.database.repository import Repository
-from techcombank_pdf.models.transaction import (
+from techcombank_parser.database.db import init_db
+from techcombank_parser.database.repository import Repository
+from techcombank_parser.models.transaction import (
     ParseResult,
     StatementMetadata,
     Transaction,

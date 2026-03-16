@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from techcombank_pdf.models.transaction import ParseResult
+from techcombank_parser.models.transaction import ParseResult
 
 
 def export_json(result: ParseResult, output_path: str | Path) -> Path:

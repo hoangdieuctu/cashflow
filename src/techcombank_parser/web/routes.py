@@ -20,7 +20,7 @@ bp = Blueprint("main", __name__)
 
 
 def _get_repo():
-    from techcombank_pdf.database.repository import Repository
+    from techcombank_parser.database.repository import Repository
     return Repository(current_app.config["DB_PATH"])
 
 
@@ -93,7 +93,7 @@ def upload():
         tmp_path = Path(tmp.name)
 
     try:
-        from techcombank_pdf.parser.statement_parser import parse_statement
+        from techcombank_parser.parser.statement_parser import parse_statement
 
         password = request.form.get("password") or None
         result = parse_statement(tmp_path, password=password)
