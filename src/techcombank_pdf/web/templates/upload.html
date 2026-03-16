@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Upload - Techcombank Parser{% endblock %}
+
+{% block extra_head %}
+<style>
+    .upload-zone {
+        border: 2px dashed #d1d5db;
+        border-radius: 16px;
+        padding: 3rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #fff;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--tcb-red);
+        background: #fff5f5;
+    }
+    .upload-zone .icon { font-size: 3rem; color: #9ca3af; }
+    .upload-zone.dragover .icon { color: var(--tcb-red); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card p-4">
+            <h5 class="fw-semibold mb-4"><i class="bi bi-cloud-arrow-up"></i> Upload Statement</h5>
+
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="icon"><i class="bi bi-file-earmark-pdf"></i></div>
+                    <p class="mt-3 mb-1 fw-semibold">Drop your PDF here or click to browse</p>
+                    <p class="text-muted small" id="fileName">Techcombank credit card statement (.pdf)</p>
+                </div>
+
+                <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
+
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="force_ocr" id="forceOcr">
+                    <label class="form-check-label" for="forceOcr">
+                        Force OCR (use for scanned/image-based PDFs)
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100 mt-3" id="submitBtn" disabled>
+                    <i class="bi bi-upload"></i> Parse & Import
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+const submitBtn = document.getElementById('submitBtn');
+
+fileInput.addEventListener('change', function() {
+    if (this.files.length > 0) {
+        fileName.textContent = this.files[0].name;
+        submitBtn.disabled = false;
+    }
+});
+
+['dragenter', 'dragover'].forEach(e => {
+    dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(e => {
+    dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); });
+});
+dropZone.addEventListener('drop', ev => {
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].name.toLowerCase().endsWith('.pdf')) {
+        fileInput.files = files;
+        fileName.textContent = files[0].name;
+        submitBtn.disabled = false;
+    }
+});
+
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+});
+</script>
+{% endblock %}
