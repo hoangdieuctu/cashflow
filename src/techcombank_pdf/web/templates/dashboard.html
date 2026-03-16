@@ -130,6 +130,64 @@
             </div>
         </div>
     </div>
+
+    <!-- Category Spending Breakdown -->
+    {% if category_summary.categories %}
+    <div class="row g-3 mt-1">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-layers-fill me-2" style="color: #7C3AED;"></i>Spending by Category (Monthly)</h6>
+                </div>
+                <div style="padding: 1rem 1.25rem;">
+                    <canvas id="categoryChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-list-check me-2" style="color: #D97706;"></i>Category Totals</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table mb-0" style="font-size: 0.82rem;">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                {% for m in category_summary.months %}
+                                <th class="text-end">{{ m[5:] }}</th>
+                                {% endfor %}
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in category_summary.categories %}
+                            <tr>
+                                <td><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ [
+                                    '#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'
+                                ][loop.index0 % 10] }}; margin-right: 6px;"></span>{{ cat.name }}</td>
+                                {% for m in category_summary.months %}
+                                <td class="text-end" style="color: #64748B;">{{ "{:,.0f}".format(cat.monthly.get(m, 0)) }}</td>
+                                {% endfor %}
+                                <td class="text-end fw-semibold">{{ "{:,.0f}".format(cat.total) }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if category_summary.uncategorized.total > 0 %}
+                            <tr style="color: #94A3B8;">
+                                <td><i class="bi bi-question-circle me-1"></i>Uncategorized</td>
+                                {% for m in category_summary.months %}
+                                <td class="text-end">{{ "{:,.0f}".format(category_summary.uncategorized.monthly.get(m, 0)) }}</td>
+                                {% endfor %}
+                                <td class="text-end fw-semibold">{{ "{:,.0f}".format(category_summary.uncategorized.total) }}</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- ══════════════════════════════════════════════ -->
@@ -183,18 +241,16 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Posting</th>
                         <th>Description</th>
                         <th class="text-end">Amount (VND)</th>
                         <th class="text-center">Type</th>
-                        <th>Source</th>
+                        <th>Category</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for txn in transactions %}
                     <tr>
                         <td class="text-nowrap fw-medium">{{ txn.transaction_date }}</td>
-                        <td class="text-nowrap" style="color: #94A3B8;">{{ txn.posting_date or '-' }}</td>
                         <td style="max-width: 350px;">
                             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ txn.description }}">{{ txn.description }}</div>
                         </td>
@@ -202,7 +258,22 @@
                             {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
                         </td>
                         <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
-                        <td style="font-size: 0.75rem; color: #94A3B8; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ txn.source_file }}</td>
+                        <td style="min-width: 140px;">
+                            <div class="category-cell" data-txn-id="{{ txn.id }}">
+                                <span class="category-display" onclick="editCategory(this)" style="cursor: pointer; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 6px; {{ 'background: #F0F9FF; color: #0369A1;' if txn.category else 'background: #F8FAFC; color: #CBD5E1;' }}">
+                                    {{ txn.category or '+ Add' }}
+                                </span>
+                                <div class="category-edit d-none">
+                                    <input type="text" class="form-control form-control-sm category-input"
+                                           value="{{ txn.category or '' }}"
+                                           list="categoryList"
+                                           placeholder="e.g. Food, Medical..."
+                                           style="font-size: 0.8rem; border-radius: 6px; border-color: #BFDBFE; padding: 0.2rem 0.4rem;"
+                                           onkeydown="if(event.key==='Enter'){saveCategory(this);event.preventDefault();}if(event.key==='Escape')cancelCategory(this);"
+                                           onblur="saveCategory(this)">
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -261,6 +332,13 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Category datalist for autocomplete -->
+<datalist id="categoryList">
+    {% for cat in categories %}
+    <option value="{{ cat }}">
+    {% endfor %}
+</datalist>
+
 <!-- Upload JS -->
 <script>
 const dropZone = document.getElementById('dropZone');
@@ -352,7 +430,107 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Category stacked bar chart
+    const catSummary = {{ category_summary | tojson }};
+    const catCanvas = document.getElementById('categoryChart');
+    if (catCanvas && catSummary.categories.length > 0) {
+        const catColors = ['#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'];
+        const monthLabels = catSummary.months.map(m => {
+            const [y, mo] = m.split('-');
+            return new Date(y, mo - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+        });
+
+        const datasets = catSummary.categories.map((cat, i) => ({
+            label: cat.name,
+            data: catSummary.months.map(m => cat.monthly[m] || 0),
+            backgroundColor: catColors[i % catColors.length],
+            borderRadius: 4, borderSkipped: false,
+        }));
+
+        if (catSummary.uncategorized.total > 0) {
+            datasets.push({
+                label: 'Uncategorized',
+                data: catSummary.months.map(m => catSummary.uncategorized.monthly[m] || 0),
+                backgroundColor: '#CBD5E1',
+                borderRadius: 4, borderSkipped: false,
+            });
+        }
+
+        new Chart(catCanvas, {
+            type: 'bar',
+            data: { labels: monthLabels, datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11, weight: '500' } }},
+                    tooltip: {
+                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
+                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: '#94A3B8', font: { size: 11 } }},
+                    y: { stacked: true, beginAtZero: true, grid: { color: '#F1F5F9' }, border: { display: false },
+                         ticks: { color: '#94A3B8', font: { size: 11 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K' }}
+                }
+            }
+        });
+    }
 });
 </script>
 {% endif %}
+
+<!-- Category inline editing -->
+<script>
+function editCategory(el) {
+    const cell = el.closest('.category-cell');
+    cell.querySelector('.category-display').classList.add('d-none');
+    const editDiv = cell.querySelector('.category-edit');
+    editDiv.classList.remove('d-none');
+    const input = editDiv.querySelector('input');
+    input.focus();
+    input.select();
+}
+
+function cancelCategory(input) {
+    const cell = input.closest('.category-cell');
+    cell.querySelector('.category-edit').classList.add('d-none');
+    cell.querySelector('.category-display').classList.remove('d-none');
+}
+
+function saveCategory(input) {
+    const cell = input.closest('.category-cell');
+    const txnId = cell.dataset.txnId;
+    const category = input.value.trim();
+    const display = cell.querySelector('.category-display');
+
+    fetch('/api/transaction/' + txnId + '/category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: category })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            display.textContent = category || '+ Add';
+            display.style.background = category ? '#F0F9FF' : '#F8FAFC';
+            display.style.color = category ? '#0369A1' : '#CBD5E1';
+            // Add to datalist if new
+            if (category) {
+                const dl = document.getElementById('categoryList');
+                const exists = Array.from(dl.options).some(o => o.value === category);
+                if (!exists) {
+                    const opt = document.createElement('option');
+                    opt.value = category;
+                    dl.appendChild(opt);
+                }
+            }
+        }
+    });
+
+    cell.querySelector('.category-edit').classList.add('d-none');
+    display.classList.remove('d-none');
+}
+</script>
 {% endblock %}

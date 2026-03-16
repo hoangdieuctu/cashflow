@@ -94,6 +94,8 @@ def index():
             offset=(page - 1) * per_page,
         )
         total = repo.get_transaction_count()
+        categories = repo.get_all_categories()
+        category_summary = repo.get_category_monthly_summary()
 
     total_pages = max(1, (total + per_page - 1) // per_page)
 
@@ -105,6 +107,8 @@ def index():
         total=total,
         page=page,
         total_pages=total_pages,
+        categories=categories,
+        category_summary=category_summary,
         filters={
             "start_date": start_date or "",
             "end_date": end_date or "",
@@ -140,3 +144,21 @@ def api_transactions():
             limit=limit,
         )
     return jsonify(txns)
+
+
+@bp.route("/api/transaction/<int:txn_id>/category", methods=["POST"])
+def update_category(txn_id: int):
+    """Update a transaction's category."""
+    data = request.get_json()
+    if data is None:
+        return jsonify({"error": "JSON body required"}), 400
+
+    category = (data.get("category") or "").strip() or None
+
+    with _get_repo() as repo:
+        ok = repo.update_transaction_category(txn_id, category)
+
+    if not ok:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    return jsonify({"ok": True, "category": category})

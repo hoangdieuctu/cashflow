@@ -177,6 +177,79 @@ class Repository:
         row = self.conn.execute("SELECT COUNT(*) as cnt FROM transactions").fetchone()
         return row["cnt"]
 
+    def update_transaction_category(self, txn_id: int, category: str | None) -> bool:
+        """Update the category of a transaction. Returns True if updated."""
+        cursor = self.conn.execute(
+            "UPDATE transactions SET category = ? WHERE id = ?",
+            (category or None, txn_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def get_all_categories(self) -> list[str]:
+        """Get all distinct non-null categories."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL AND category != '' ORDER BY category"
+        ).fetchall()
+        return [row["category"] for row in rows]
+
+    def get_category_monthly_summary(self) -> dict[str, Any]:
+        """Get spending by category per month (debit only).
+
+        Returns:
+            {
+                "months": ["2026-01", "2026-02"],
+                "categories": [
+                    {"name": "Food", "monthly": {"2026-01": 500000, "2026-02": 300000}, "total": 800000},
+                    ...
+                ],
+                "uncategorized": {"monthly": {...}, "total": ...}
+            }
+        """
+        rows = self.conn.execute(
+            """SELECT
+                substr(transaction_date, 1, 7) as month,
+                COALESCE(category, '') as cat,
+                SUM(CAST(billing_amount_vnd AS REAL)) as spending
+               FROM transactions
+               WHERE transaction_type = 'debit'
+               GROUP BY month, cat
+               ORDER BY month, cat"""
+        ).fetchall()
+
+        months_set: set[str] = set()
+        cat_data: dict[str, dict[str, float]] = {}
+
+        for row in rows:
+            month = row["month"]
+            cat = row["cat"] or ""
+            months_set.add(month)
+            if cat not in cat_data:
+                cat_data[cat] = {}
+            cat_data[cat][month] = row["spending"]
+
+        months = sorted(months_set)
+
+        categories = []
+        uncategorized = {"monthly": {}, "total": 0.0}
+
+        for cat, monthly in sorted(cat_data.items()):
+            total = sum(monthly.values())
+            entry = {"name": cat, "monthly": monthly, "total": total}
+            if cat == "":
+                uncategorized = {"monthly": monthly, "total": total}
+            else:
+                categories.append(entry)
+
+        # Sort by total descending
+        categories.sort(key=lambda c: c["total"], reverse=True)
+
+        return {
+            "months": months,
+            "categories": categories,
+            "uncategorized": uncategorized,
+        }
+
 
 def _date_str(d: date | None) -> str | None:
     return d.isoformat() if d else None
