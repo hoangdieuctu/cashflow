@@ -1,126 +1,169 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Techcombank Parser{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Stats Row -->
+{% if summary.total_transactions == 0 %}
+<!-- ── Welcome / Empty State ── -->
+<div class="card" style="margin-top: 2rem;">
+    <div class="empty-state" style="padding: 4rem 2rem;">
+        <div class="empty-icon">
+            <i class="bi bi-credit-card-2-front"></i>
+        </div>
+        <h5>Welcome to Techcombank Parser</h5>
+        <p>Upload your first credit card statement to see spending analytics, charts, and detailed transaction history.</p>
+        <a href="{{ url_for('main.upload') }}" class="btn btn-danger px-4 py-2" style="border-radius: 10px; font-weight: 600;">
+            <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Statement
+        </a>
+        <div class="mt-4 d-flex justify-content-center gap-4" style="color: #94A3B8; font-size: 0.8rem;">
+            <span><i class="bi bi-filetype-pdf me-1"></i>PDF parsing</span>
+            <span><i class="bi bi-bar-chart me-1"></i>Analytics</span>
+            <span><i class="bi bi-download me-1"></i>Excel / CSV / JSON</span>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- ── Stats Row ── -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-receipt-cutoff"></i></div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-start justify-content-between">
                 <div>
-                    <div class="text-muted small">Total Transactions</div>
-                    <div class="stat-value">{{ summary.total_transactions }}</div>
+                    <div class="stat-label">Total Transactions</div>
+                    <div class="stat-value">{{ "{:,}".format(summary.total_transactions) }}</div>
+                    <div class="stat-sub">{{ statements|length }} statement{{ 's' if statements|length != 1 }}</div>
                 </div>
+                <div class="stat-icon blue"><i class="bi bi-receipt"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-arrow-down-circle"></i></div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-start justify-content-between">
                 <div>
-                    <div class="text-muted small">Total Spending</div>
+                    <div class="stat-label">Total Spending</div>
                     <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit) }}</div>
+                    <div class="stat-sub">VND (debit)</div>
                 </div>
+                <div class="stat-icon red"><i class="bi bi-arrow-down-circle"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-arrow-up-circle"></i></div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-start justify-content-between">
                 <div>
-                    <div class="text-muted small">Total Credits</div>
+                    <div class="stat-label">Total Credits</div>
                     <div class="stat-value">{{ "{:,.0f}".format(summary.total_credit) }}</div>
+                    <div class="stat-sub">VND (refunds/payments)</div>
                 </div>
+                <div class="stat-icon green"><i class="bi bi-arrow-up-circle"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-file-earmark-text"></i></div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-start justify-content-between">
                 <div>
-                    <div class="text-muted small">Statements</div>
-                    <div class="stat-value">{{ statements|length }}</div>
+                    <div class="stat-label">Net Spend</div>
+                    <div class="stat-value">{{ "{:,.0f}".format(summary.total_debit - summary.total_credit) }}</div>
+                    <div class="stat-sub">VND</div>
                 </div>
+                <div class="stat-icon amber"><i class="bi bi-wallet2"></i></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Charts Row -->
+<!-- ── Charts Row ── -->
 <div class="row g-3 mb-4">
     <div class="col-lg-8">
-        <div class="card p-3">
-            <h6 class="mb-3 fw-semibold"><i class="bi bi-bar-chart"></i> Monthly Spending</h6>
-            <canvas id="monthlyChart" height="280"></canvas>
+        <div class="card">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-bar-chart-fill me-2" style="color: var(--tcb-red);"></i>Monthly Spending</h6>
+            </div>
+            <div style="padding: 1rem 1.25rem;">
+                <canvas id="monthlyChart" height="300"></canvas>
+            </div>
         </div>
     </div>
     <div class="col-lg-4">
-        <div class="card p-3">
-            <h6 class="mb-3 fw-semibold"><i class="bi bi-pie-chart"></i> Debit vs Credit</h6>
-            <canvas id="typeChart" height="280"></canvas>
+        <div class="card">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-pie-chart-fill me-2" style="color: #2563EB;"></i>Debit vs Credit</h6>
+            </div>
+            <div style="padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: center;">
+                <canvas id="typeChart" height="240"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Recent Transactions -->
-<div class="card p-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="mb-0 fw-semibold"><i class="bi bi-clock-history"></i> Recent Transactions</h6>
-        <a href="{{ url_for('main.transactions') }}" class="btn btn-sm btn-outline-primary">View All</a>
+<!-- ── Recent Transactions ── -->
+<div class="card mb-4">
+    <div class="card-header-custom">
+        <h6><i class="bi bi-clock-history me-2" style="color: #D97706;"></i>Recent Transactions</h6>
+        <a href="{{ url_for('main.transactions') }}" class="btn btn-sm" style="background: #F1F5F9; color: var(--tcb-navy); font-size: 0.78rem; font-weight: 600; border-radius: 8px;">
+            View All <i class="bi bi-arrow-right ms-1"></i>
+        </a>
     </div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table mb-0">
             <thead>
                 <tr>
                     <th>Date</th>
                     <th>Description</th>
                     <th class="text-end">Amount (VND)</th>
-                    <th>Type</th>
+                    <th class="text-center">Type</th>
                 </tr>
             </thead>
             <tbody>
                 {% for txn in recent_transactions %}
                 <tr>
                     <td class="text-nowrap">{{ txn.transaction_date }}</td>
-                    <td>{{ txn.description[:60] }}</td>
-                    <td class="text-end fw-semibold">{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}</td>
-                    <td><span class="badge badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
+                    <td style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ txn.description }}</td>
+                    <td class="text-end amount-{{ txn.transaction_type }}">
+                        {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
+                    </td>
+                    <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
                 </tr>
-                {% else %}
-                <tr><td colspan="4" class="text-center text-muted py-4">No transactions yet. <a href="{{ url_for('main.upload') }}">Upload a statement</a>.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Statements List -->
+<!-- ── Imported Statements ── -->
 {% if statements %}
-<div class="card p-3 mt-4">
-    <h6 class="mb-3 fw-semibold"><i class="bi bi-file-earmark-pdf"></i> Imported Statements</h6>
+<div class="card">
+    <div class="card-header-custom">
+        <h6><i class="bi bi-file-earmark-pdf-fill me-2" style="color: var(--tcb-red);"></i>Imported Statements</h6>
+    </div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table mb-0">
             <thead>
                 <tr>
                     <th>File</th>
                     <th>Statement Date</th>
-                    <th>Transactions</th>
-                    <th>Method</th>
+                    <th class="text-center">Transactions</th>
+                    <th class="text-center">Method</th>
                     <th>Imported</th>
                 </tr>
             </thead>
             <tbody>
                 {% for stmt in statements %}
                 <tr>
-                    <td>{{ stmt.source_file }}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-file-earmark-pdf" style="color: var(--tcb-red); font-size: 1.1rem;"></i>
+                            {{ stmt.source_file }}
+                        </div>
+                    </td>
                     <td>{{ stmt.statement_date or '-' }}</td>
-                    <td>{{ stmt.transaction_count }}</td>
-                    <td><span class="badge bg-secondary">{{ stmt.parse_method }}</span></td>
-                    <td>{{ stmt.imported_at }}</td>
+                    <td class="text-center fw-semibold">{{ stmt.transaction_count }}</td>
+                    <td class="text-center"><span class="badge-method">{{ stmt.parse_method }}</span></td>
+                    <td class="text-muted" style="font-size: 0.8rem;">{{ stmt.imported_at }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -128,43 +171,73 @@
     </div>
 </div>
 {% endif %}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if summary.total_transactions > 0 %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+
     const monthlyData = {{ summary.monthly | tojson }};
 
-    // Monthly spending bar chart
     if (monthlyData.length > 0) {
-        new Chart(document.getElementById('monthlyChart'), {
+        const ctx1 = document.getElementById('monthlyChart');
+        new Chart(ctx1, {
             type: 'bar',
             data: {
-                labels: monthlyData.map(m => m.month),
+                labels: monthlyData.map(m => {
+                    const [y, mo] = m.month.split('-');
+                    return new Date(y, mo - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+                }),
                 datasets: [{
-                    label: 'Spending (VND)',
+                    label: 'Spending',
                     data: monthlyData.map(m => m.spending),
-                    backgroundColor: 'rgba(228, 0, 43, 0.7)',
-                    borderRadius: 6,
+                    backgroundColor: monthlyData.map((_, i) => {
+                        const colors = ['#E4002B', '#FF4D6D', '#FF758F', '#E4002B', '#FF4D6D', '#FF758F'];
+                        return colors[i % colors.length];
+                    }),
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    maxBarThickness: 48,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0F172A',
+                        titleFont: { weight: '600' },
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND'
+                        }
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
+                        grid: { color: '#F1F5F9' },
+                        border: { display: false },
                         ticks: {
-                            callback: v => (v / 1000000).toFixed(1) + 'M'
+                            color: '#94A3B8', font: { size: 11, weight: '500' },
+                            callback: v => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : (v / 1000).toFixed(0) + 'K'
                         }
+                    },
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: '#94A3B8', font: { size: 11, weight: '500' } }
                     }
                 }
             }
         });
     }
 
-    // Debit vs Credit doughnut
     const debit = {{ summary.total_debit }};
     const credit = {{ summary.total_credit }};
     if (debit > 0 || credit > 0) {
@@ -174,16 +247,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: ['Debit', 'Credit'],
                 datasets: [{
                     data: [debit, credit],
-                    backgroundColor: ['#e4002b', '#059669'],
+                    backgroundColor: ['#E4002B', '#16A34A'],
+                    borderWidth: 0,
+                    spacing: 4,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '65%',
+                cutout: '72%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed) + ' VND'
+                        }
+                    }
+                }
             }
         });
     }
 });
 </script>
+{% endif %}
 {% endblock %}
