@@ -78,6 +78,7 @@ def index():
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     txn_type = request.args.get("type")
+    category = request.args.get("category")
     search = request.args.get("search")
     page = int(request.args.get("page", 1))
     per_page = 50
@@ -89,6 +90,7 @@ def index():
             start_date=start_date,
             end_date=end_date,
             transaction_type=txn_type,
+            category=category,
             search=search,
             limit=per_page,
             offset=(page - 1) * per_page,
@@ -113,6 +115,7 @@ def index():
             "start_date": start_date or "",
             "end_date": end_date or "",
             "type": txn_type or "",
+            "category": category or "",
             "search": search or "",
         },
     )

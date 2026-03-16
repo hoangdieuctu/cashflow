@@ -98,6 +98,7 @@ class Repository:
         start_date: str | None = None,
         end_date: str | None = None,
         transaction_type: str | None = None,
+        category: str | None = None,
         search: str | None = None,
         limit: int = 500,
         offset: int = 0,
@@ -115,6 +116,11 @@ class Repository:
         if transaction_type:
             conditions.append("t.transaction_type = ?")
             params.append(transaction_type)
+        if category == "__uncategorized__":
+            conditions.append("(t.category IS NULL OR t.category = '')")
+        elif category:
+            conditions.append("t.category = ?")
+            params.append(category)
         if search:
             conditions.append("t.description LIKE ?")
             params.append(f"%{search}%")
