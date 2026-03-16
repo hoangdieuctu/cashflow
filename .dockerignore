@@ -1,0 +1,10 @@
+.git/
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+data/
+techcombank.db
+tests/
+*.md
