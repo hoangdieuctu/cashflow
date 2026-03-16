@@ -125,7 +125,7 @@ def upload():
 
         flash(
             f"Successfully imported {result.transaction_count} transactions "
-            f"from {file.filename} (method: {result.parse_method}).",
+            f"from {file.filename}.",
             "success",
         )
 
