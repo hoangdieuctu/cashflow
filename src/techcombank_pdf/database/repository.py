@@ -199,11 +199,23 @@ class Repository:
             params,
         ).fetchall()
 
+        yearly = self.conn.execute(
+            f"""SELECT
+                substr(transaction_date, 1, 4) as year,
+                SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as spending,
+                COUNT(*) as count
+               FROM transactions {where}
+               GROUP BY substr(transaction_date, 1, 4)
+               ORDER BY year""",
+            params,
+        ).fetchall()
+
         return {
             "total_transactions": row["total_transactions"],
             "total_debit": row["total_debit"] or 0,
             "total_credit": row["total_credit"] or 0,
             "monthly": [dict(m) for m in monthly],
+            "yearly": [dict(y) for y in yearly],
         }
 
     def get_statements(self) -> list[dict[str, Any]]:

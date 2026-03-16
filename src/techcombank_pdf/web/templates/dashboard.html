@@ -125,10 +125,10 @@
         <div class="col-lg-4">
             <div class="card" style="height: 100%;">
                 <div class="card-header-custom">
-                    <h6><i class="bi bi-pie-chart-fill me-2" style="color: #2563EB;"></i>Debit vs Credit</h6>
+                    <h6><i class="bi bi-calendar3 me-2" style="color: #2563EB;"></i>Yearly Spending</h6>
                 </div>
                 <div style="padding: 1.5rem 1.25rem; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 260px;">
-                    <canvas id="typeChart"></canvas>
+                    <canvas id="yearlyChart"></canvas>
                 </div>
             </div>
         </div>
@@ -154,7 +154,7 @@
                             <tr>
                                 <th style="white-space: nowrap; width: 1%; padding-right: 1.5rem;">Category</th>
                                 {% for m in category_summary.months %}
-                                <th class="text-end" style="white-space: nowrap;">{{ m[5:] }}</th>
+                                <th class="text-end" style="white-space: nowrap;">{{ m }}</th>
                                 {% endfor %}
                                 <th class="text-end" style="white-space: nowrap;">Total</th>
                             </tr>
@@ -341,20 +341,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const debit = {{ summary.total_debit }}, credit = {{ summary.total_credit }};
-    if (debit > 0 || credit > 0) {
-        new Chart(document.getElementById('typeChart'), {
-            type: 'doughnut',
+    const yearlyData = {{ summary.yearly | tojson }};
+    if (yearlyData.length > 0) {
+        new Chart(document.getElementById('yearlyChart'), {
+            type: 'bar',
             data: {
-                labels: ['Debit', 'Credit'],
-                datasets: [{ data: [debit, credit], backgroundColor: ['#E4002B','#16A34A'], borderWidth: 0, spacing: 4 }]
+                labels: yearlyData.map(y => y.year),
+                datasets: [{
+                    label: 'Spending',
+                    data: yearlyData.map(y => y.spending),
+                    backgroundColor: yearlyData.map((_, i) => ['#2563EB','#3B82F6','#60A5FA'][i % 3]),
+                    borderRadius: 8, borderSkipped: false, maxBarThickness: 60,
+                }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false, cutout: '72%',
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } }},
-                    tooltip: { backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
-                        callbacks: { label: ctx => ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed) + ' VND' }}
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
+                        callbacks: { label: ctx => new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#F1F5F9' }, border: { display: false },
+                         ticks: { color: '#94A3B8', font: { size: 11 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K' }},
+                    x: { grid: { display: false }, border: { display: false }, ticks: { color: '#94A3B8', font: { size: 11 } }}
                 }
             }
         });
