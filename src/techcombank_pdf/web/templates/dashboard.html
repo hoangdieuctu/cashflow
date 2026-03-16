@@ -506,16 +506,8 @@ function saveCategory(input) {
     const category = input.value.trim();
     const display = cell.querySelector('.category-display');
 
-    // Count how many other rows share this merchant
-    let matchCount = 0;
-    if (merchant && category) {
-        document.querySelectorAll('.category-cell').forEach(c => {
-            if (c.dataset.merchant === merchant && c.dataset.txnId !== txnId) matchCount++;
-        });
-    }
-
-    const applyToMerchant = matchCount > 0 && category &&
-        confirm(`Apply "${category}" to all ${matchCount + 1} transactions from "${merchant}"?`);
+    // Always apply to all transactions with the same merchant
+    const applyToMerchant = !!(merchant && category);
 
     fetch('/api/transaction/' + txnId + '/category', {
         method: 'POST',
@@ -525,7 +517,7 @@ function saveCategory(input) {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            if (applyToMerchant) {
+            if (applyToMerchant && data.updated_count > 1) {
                 // Update all matching merchant cells on the page
                 document.querySelectorAll('.category-cell').forEach(c => {
                     if (c.dataset.merchant === merchant) {
@@ -535,10 +527,12 @@ function saveCategory(input) {
                         d.style.color = '#0369A1';
                     }
                 });
+                showNotify(`Updated ${data.updated_count} transactions from "${merchant}"`);
             } else {
                 display.textContent = category || '+ Add';
                 display.style.background = category ? '#F0F9FF' : '#F8FAFC';
                 display.style.color = category ? '#0369A1' : '#CBD5E1';
+                if (category) showNotify('Category saved');
             }
             // Add to datalist if new
             if (category) {
@@ -555,6 +549,15 @@ function saveCategory(input) {
 
     cell.querySelector('.category-edit').classList.add('d-none');
     display.classList.remove('d-none');
+}
+
+function showNotify(msg) {
+    const el = document.createElement('div');
+    el.className = 'alert alert-info alert-dismissible fade show';
+    el.style.cssText = 'font-size:0.82rem;';
+    el.innerHTML = msg + '<button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>';
+    document.querySelector('.flash-container').appendChild(el);
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 200); }, 3000);
 }
 </script>
 {% endblock %}
