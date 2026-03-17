@@ -176,48 +176,59 @@ class Repository:
 
         return [dict(row) for row in rows]
 
-    def get_spending_summary(self, statement_id: int | None = None, category: str | None = None) -> dict[str, Any]:
+    def get_spending_summary(self, statement_id: int | None = None, category: str | None = None, statement_type: str | None = None, start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
         """Get aggregate spending summary."""
         conditions: list[str] = []
         params: list[Any] = []
+        if start_date:
+            conditions.append("t.transaction_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("t.transaction_date <= ?")
+            params.append(end_date)
         if statement_id:
-            conditions.append("statement_id = ?")
+            conditions.append("t.statement_id = ?")
             params.append(statement_id)
+        if statement_type:
+            conditions.append("s.statement_type = ?")
+            params.append(statement_type)
         if category == "__uncategorized__":
-            conditions.append("(category IS NULL OR category = '')")
+            conditions.append("(t.category IS NULL OR t.category = '')")
         elif category:
-            conditions.append("category = ?")
+            conditions.append("t.category = ?")
             params.append(category)
 
+        join = "JOIN statements s ON t.statement_id = s.id"
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         row = self.conn.execute(
             f"""SELECT
                 COUNT(*) as total_transactions,
-                SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as total_debit,
-                SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as total_credit
-               FROM transactions {where}""",
+                SUM(CASE WHEN t.transaction_type='debit' THEN CAST(t.billing_amount_vnd AS REAL) ELSE 0 END) as total_debit,
+                SUM(CASE WHEN t.transaction_type='credit' THEN CAST(t.billing_amount_vnd AS REAL) ELSE 0 END) as total_credit
+               FROM transactions t {join} {where}""",
             params,
         ).fetchone()
 
         monthly = self.conn.execute(
             f"""SELECT
-                substr(transaction_date, 1, 7) as month,
-                SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as spending,
+                substr(t.transaction_date, 1, 7) as month,
+                SUM(CASE WHEN t.transaction_type='debit' THEN CAST(t.billing_amount_vnd AS REAL) ELSE 0 END) as spending,
+                SUM(CASE WHEN t.transaction_type='credit' THEN CAST(t.billing_amount_vnd AS REAL) ELSE 0 END) as income,
                 COUNT(*) as count
-               FROM transactions {where}
-               GROUP BY substr(transaction_date, 1, 7)
+               FROM transactions t {join} {where}
+               GROUP BY substr(t.transaction_date, 1, 7)
                ORDER BY month""",
             params,
         ).fetchall()
 
         yearly = self.conn.execute(
             f"""SELECT
-                substr(transaction_date, 1, 4) as year,
-                SUM(CASE WHEN transaction_type='debit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END) as spending,
+                substr(t.transaction_date, 1, 4) as year,
+                SUM(CASE WHEN t.transaction_type='debit' THEN CAST(t.billing_amount_vnd AS REAL) ELSE 0 END) as spending,
                 COUNT(*) as count
-               FROM transactions {where}
-               GROUP BY substr(transaction_date, 1, 4)
+               FROM transactions t {join} {where}
+               GROUP BY substr(t.transaction_date, 1, 4)
                ORDER BY year""",
             params,
         ).fetchall()
@@ -230,15 +241,27 @@ class Repository:
             "yearly": [dict(y) for y in yearly],
         }
 
-    def get_statements(self) -> list[dict[str, Any]]:
-        """List all imported statements."""
+    def get_statements(self, start_date: str | None = None, end_date: str | None = None) -> list[dict[str, Any]]:
+        """List all imported statements, optionally filtered to those with transactions in the date range."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        if start_date:
+            conditions.append("t.transaction_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("t.transaction_date <= ?")
+            params.append(end_date)
+        having = "HAVING COUNT(t.id) > 0" if conditions else ""
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         rows = self.conn.execute(
-            """SELECT s.*,
+            f"""SELECT s.*,
                 COUNT(t.id) as transaction_count
                FROM statements s
-               LEFT JOIN transactions t ON s.id = t.statement_id
+               LEFT JOIN transactions t ON s.id = t.statement_id {where}
                GROUP BY s.id
-               ORDER BY s.statement_date DESC"""
+               {having}
+               ORDER BY s.statement_date DESC""",
+            params,
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -248,10 +271,18 @@ class Repository:
         category: str | None = None,
         search: str | None = None,
         statement_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> int:
         """Get total number of transactions matching filters."""
         conditions: list[str] = []
         params: list[Any] = []
+        if start_date:
+            conditions.append("t.transaction_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("t.transaction_date <= ?")
+            params.append(end_date)
         if statement_id:
             conditions.append("t.statement_id = ?")
             params.append(statement_id)
@@ -297,46 +328,70 @@ class Repository:
         self.conn.commit()
         return cursor.rowcount
 
-    def get_all_categories(self) -> list[str]:
-        """Get all distinct non-null categories."""
+    def get_available_years_months(self) -> list[str]:
+        """Return available year-month values sorted descending, e.g. ['2026-02', '2026-01', ...]."""
         rows = self.conn.execute(
-            "SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL AND category != '' ORDER BY category"
+            """SELECT DISTINCT substr(transaction_date,1,7) as ym
+               FROM transactions ORDER BY ym DESC"""
+        ).fetchall()
+        return [row["ym"] for row in rows]
+
+    def get_all_categories(self, statement_id: int | None = None, statement_type: str | None = None, start_date: str | None = None, end_date: str | None = None) -> list[str]:
+        """Get all distinct non-null categories, optionally filtered."""
+        conditions = ["t.category IS NOT NULL", "t.category != ''"]
+        params: list[Any] = []
+        if start_date:
+            conditions.append("t.transaction_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("t.transaction_date <= ?")
+            params.append(end_date)
+        if statement_id:
+            conditions.append("t.statement_id = ?")
+            params.append(statement_id)
+        if statement_type:
+            conditions.append("s.statement_type = ?")
+            params.append(statement_type)
+        where = "WHERE " + " AND ".join(conditions)
+        join = "JOIN statements s ON t.statement_id = s.id" if statement_type else ""
+        rows = self.conn.execute(
+            f"SELECT DISTINCT t.category FROM transactions t {join} {where} ORDER BY t.category",
+            params,
         ).fetchall()
         return [row["category"] for row in rows]
 
-    def get_category_monthly_summary(self, statement_id: int | None = None, category: str | None = None) -> dict[str, Any]:
-        """Get spending by category per month (debit only).
-
-        Returns:
-            {
-                "months": ["2026-01", "2026-02"],
-                "categories": [
-                    {"name": "Food", "monthly": {"2026-01": 500000, "2026-02": 300000}, "total": 800000},
-                    ...
-                ],
-                "uncategorized": {"monthly": {...}, "total": ...}
-            }
-        """
-        conditions = ["transaction_type = 'debit'"]
+    def get_category_monthly_summary(self, statement_id: int | None = None, category: str | None = None, statement_type: str | None = None, start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
+        """Get spending by category per month (debit only)."""
+        conditions = ["t.transaction_type = 'debit'"]
         params: list[Any] = []
+        if start_date:
+            conditions.append("t.transaction_date >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("t.transaction_date <= ?")
+            params.append(end_date)
         if statement_id:
-            conditions.append("statement_id = ?")
+            conditions.append("t.statement_id = ?")
             params.append(statement_id)
+        if statement_type:
+            conditions.append("s.statement_type = ?")
+            params.append(statement_type)
         if category == "__uncategorized__":
-            conditions.append("(category IS NULL OR category = '')")
+            conditions.append("(t.category IS NULL OR t.category = '')")
         elif category:
-            conditions.append("category = ?")
+            conditions.append("t.category = ?")
             params.append(category)
 
         where = "WHERE " + " AND ".join(conditions)
 
         rows = self.conn.execute(
             f"""SELECT
-                substr(transaction_date, 1, 7) as month,
-                COALESCE(category, '') as cat,
-                SUM(CAST(billing_amount_vnd AS REAL)) as spending,
+                substr(t.transaction_date, 1, 7) as month,
+                COALESCE(t.category, '') as cat,
+                SUM(CAST(t.billing_amount_vnd AS REAL)) as spending,
                 COUNT(*) as txn_count
-               FROM transactions
+               FROM transactions t
+               JOIN statements s ON t.statement_id = s.id
                {where}
                GROUP BY month, cat
                ORDER BY month, cat""",
@@ -397,6 +452,15 @@ class Repository:
         )
         self.conn.commit()
         return cursor.lastrowid
+
+    def update_rule(self, rule_id: int, category: str) -> bool:
+        """Update the category of a rule. Returns True if updated."""
+        cursor = self.conn.execute(
+            "UPDATE category_rules SET category = ? WHERE id = ?",
+            (category.strip(), rule_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
 
     def delete_rule(self, rule_id: int) -> bool:
         """Delete a category rule. Returns True if deleted."""

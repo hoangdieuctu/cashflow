@@ -51,7 +51,13 @@
     <div class="col-lg-7">
         <div class="card">
             <div class="card-header-custom">
-                <h6><i class="bi bi-tag-fill me-2" style="color: #7C3AED;"></i>Rules <span style="font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-left: 4px;">{{ rules|length }}</span></h6>
+                <h6><i class="bi bi-tag-fill me-2" style="color: #7C3AED;"></i>Rules <span style="font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-left: 4px;" id="ruleCount">{{ rules|length }}</span></h6>
+                <select id="categoryFilter" class="form-select form-select-sm" style="width: auto; border-radius: 8px; border-color: #E2E8F0; font-size: 0.78rem;" onchange="filterRules()">
+                    <option value="">All categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="table-responsive">
                 <table class="table mb-0" id="rulesTable">
@@ -74,10 +80,9 @@
                                 </span>
                             </td>
                             <td style="font-weight: 600; font-family: monospace; font-size: 0.85rem;">{{ rule.pattern }}</td>
-                            <td>
-                                <span style="font-size: 0.78rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; background: #F0FDF4; color: #16A34A;">
-                                    {{ rule.category }}
-                                </span>
+                            <td class="rule-cat-cell" data-rule-id="{{ rule.id }}">
+                                <span class="rule-cat-badge" onclick="editRuleCat(this)" style="font-size: 0.78rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; background: #F0FDF4; color: #16A34A; cursor: pointer;" title="Click to edit">{{ rule.category }}</span>
+                                <input type="text" class="rule-cat-input form-control form-control-sm" list="categoryList" value="{{ rule.category }}" onkeydown="ruleCatKey(event,this)" onblur="ruleCatBlur(this)" style="display:none; border-radius: 6px; border-color: #86EFAC; font-size: 0.78rem; font-weight: 600; color: #16A34A; width: 130px; padding: 0.1rem 0.4rem;">
                             </td>
                             <td class="text-center" style="color: #94A3B8;">{{ rule.priority }}</td>
                             <td class="text-end">
@@ -158,6 +163,73 @@ function applyRules() {
             showNotify('Updated ' + res.updated + ' transaction' + (res.updated !== 1 ? 's' : ''));
         }
     });
+}
+
+// Inline category editing
+function editRuleCat(badge) {
+    const input = badge.nextElementSibling;
+    badge.style.display = 'none';
+    input.style.display = 'inline-block';
+    input.focus();
+    input.select();
+}
+
+function ruleCatKey(e, input) {
+    if (e.key === 'Enter') { e.preventDefault(); saveRuleCat(input); }
+    if (e.key === 'Escape') { cancelRuleCat(input); }
+}
+
+let _ruleCatSaving = false;
+function ruleCatBlur(input) {
+    setTimeout(() => { if (!_ruleCatSaving) saveRuleCat(input); }, 200);
+}
+
+function saveRuleCat(input) {
+    _ruleCatSaving = true;
+    const badge = input.previousElementSibling;
+    const ruleId = input.closest('.rule-cat-cell').dataset.ruleId;
+    const newCat = input.value.trim();
+    if (!newCat || newCat === badge.textContent.trim()) {
+        cancelRuleCat(input);
+        _ruleCatSaving = false;
+        return;
+    }
+    fetch('/api/rules/' + ruleId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: newCat })
+    })
+    .then(r => r.json())
+    .then(res => {
+        _ruleCatSaving = false;
+        if (res.ok) {
+            badge.textContent = res.category;
+            input.value = res.category;
+            showNotify('Category updated');
+        } else {
+            showNotify(res.error || 'Failed to update');
+        }
+        cancelRuleCat(input);
+    });
+}
+
+function cancelRuleCat(input) {
+    const badge = input.previousElementSibling;
+    input.value = badge.textContent.trim();
+    input.style.display = 'none';
+    badge.style.display = '';
+}
+
+function filterRules() {
+    const val = document.getElementById('categoryFilter').value.toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('#rulesTable tbody tr[id^="rule-"]').forEach(row => {
+        const cat = row.querySelector('.rule-cat-badge').textContent.trim().toLowerCase();
+        const show = !val || cat === val;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('ruleCount').textContent = visible;
 }
 
 function showNotify(msg) {

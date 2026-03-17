@@ -35,17 +35,36 @@ def index():
     statement_id = int(statement_id_str) if statement_id_str else None
     statement_type = request.args.get("statement_type")
     search = request.args.get("search")
+    period = request.args.get("period")
+    # Default to current year if period not specified
+    if period is None:
+        from datetime import date
+        period = str(date.today().year)
+    period = period  # may be "" (user explicitly cleared) or "YYYY" or "YYYY-MM"
     page = int(request.args.get("page", 1))
     per_page = 50
 
+    # Derive start_date/end_date from period
+    if period and len(period) == 7:  # YYYY-MM
+        import calendar
+        y, m = int(period[:4]), int(period[5:7])
+        last_day = calendar.monthrange(y, m)[1]
+        start_date = f"{period}-01"
+        end_date = f"{period}-{last_day:02d}"
+    elif period and len(period) == 4:  # YYYY
+        start_date = f"{period}-01-01"
+        end_date = f"{period}-12-31"
+
     with _get_repo() as repo:
         all_statements = repo.get_statements()
+        period_statements = repo.get_statements(start_date=start_date, end_date=end_date)
+        period_options = repo.get_available_years_months()
 
-        # Filter statements list by card type for the dropdown
+        # Filter statements list by card type for the dropdown (period-scoped)
         if statement_type:
-            filtered_statements = [s for s in all_statements if s["statement_type"] == statement_type]
+            filtered_statements = [s for s in period_statements if s["statement_type"] == statement_type]
         else:
-            filtered_statements = all_statements
+            filtered_statements = period_statements
 
         # Clear statement_id if it doesn't belong to the selected card type
         if statement_id and statement_type:
@@ -54,7 +73,7 @@ def index():
                 statement_id = None
                 statement_id_str = ""
 
-        summary = repo.get_spending_summary(statement_id=statement_id, category=category)
+        summary = repo.get_spending_summary(statement_id=statement_id, category=category, statement_type=statement_type, start_date=start_date, end_date=end_date)
         txns = repo.get_transactions(
             start_date=start_date,
             end_date=end_date,
@@ -66,9 +85,9 @@ def index():
             limit=per_page,
             offset=(page - 1) * per_page,
         )
-        total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search, statement_type=statement_type)
-        categories = repo.get_all_categories()
-        category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category)
+        total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search, statement_type=statement_type, start_date=start_date, end_date=end_date)
+        categories = repo.get_all_categories(statement_id=statement_id, statement_type=statement_type, start_date=start_date, end_date=end_date)
+        category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category, statement_type=statement_type, start_date=start_date, end_date=end_date)
 
     total_pages = max(1, (total + per_page - 1) // per_page)
 
@@ -77,13 +96,14 @@ def index():
         summary=summary,
         statements=filtered_statements,
         has_any_statements=len(all_statements) > 0,
-        total_statements=len(all_statements),
+        total_statements=len(period_statements),
         transactions=txns,
         total=total,
         page=page,
         total_pages=total_pages,
         categories=categories,
         category_summary=category_summary,
+        period_options=period_options,
         filters={
             "start_date": start_date or "",
             "end_date": end_date or "",
@@ -92,6 +112,7 @@ def index():
             "statement_id": statement_id_str or "",
             "statement_type": statement_type or "",
             "search": search or "",
+            "period": period,
         },
     )
 
@@ -206,6 +227,22 @@ def delete_rule(rule_id: int):
     if not ok:
         return jsonify({"error": "Rule not found"}), 404
     return jsonify({"ok": True})
+
+
+@bp.route("/api/rules/<int:rule_id>", methods=["PUT"])
+def update_rule(rule_id: int):
+    """Update a category rule's category."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    category = (data.get("category") or "").strip()
+    if not category:
+        return jsonify({"error": "category is required"}), 400
+    with _get_repo() as repo:
+        ok = repo.update_rule(rule_id, category)
+    if not ok:
+        return jsonify({"error": "Rule not found"}), 404
+    return jsonify({"ok": True, "category": category})
 
 
 @bp.route("/api/rules/apply", methods=["POST"])

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block topbar_right %}<span style="font-size: 0.8rem; color: #64748B; font-weight: 500;">{{ total }} transaction{{ 's' if total != 1 }}</span>{% endblock %}
+{% block topbar_right %}{% endblock %}
 
 {% block content %}
 {% if not has_any_statements %}
@@ -24,6 +24,25 @@
 <div class="card mb-4" style="padding: 0.85rem 1.25rem;">
     <form method="get" id="filterForm" class="row g-2 align-items-end">
         <div class="col-md-2">
+            <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Period</label>
+            <select class="form-select form-select-sm" name="period" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
+                <option value="">All time</option>
+                {% set _seen_years = namespace(v=[]) %}
+                {% for ym in period_options %}
+                    {% set yr = ym[:4] %}
+                    {% if yr not in _seen_years.v %}
+                        {% set _seen_years.v = _seen_years.v + [yr] %}
+                        <option value="{{ yr }}" {{ 'selected' if filters.period == yr }}>{{ yr }}</option>
+                    {% endif %}
+                    {% set mo = ym[5:7] %}
+                    {% set mo_names = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'} %}
+                    <option value="{{ ym }}" {{ 'selected' if filters.period == ym }} style="padding-left: 1rem;">
+                        &nbsp;&nbsp;{{ yr }} - {{ mo_names[mo] }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
             <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Card Type</label>
             <select class="form-select form-select-sm" name="statement_type" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                 <option value="">All</option>
@@ -32,7 +51,7 @@
             </select>
         </div>
         {% if statements|length > 1 %}
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statement</label>
             <select class="form-select form-select-sm" name="statement_id" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                 <option value="">All statements</option>
@@ -45,7 +64,7 @@
             </select>
         </div>
         {% endif %}
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label" style="font-size: 0.7rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
             <select class="form-select form-select-sm" name="category" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                 <option value="">All</option>
@@ -136,10 +155,10 @@
         <div class="col-lg-4">
             <div class="card" style="height: 100%;">
                 <div class="card-header-custom">
-                    <h6><i class="bi bi-calendar3 me-2" style="color: #2563EB;"></i>Yearly Spending</h6>
+                    <h6><i class="bi bi-arrow-left-right me-2" style="color: #7C3AED;"></i>Debit vs Credit</h6>
                 </div>
-                <div style="padding: 1.5rem 1.25rem; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 260px;">
-                    <canvas id="yearlyChart"></canvas>
+                <div style="padding: 1rem 1.25rem; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 260px;">
+                    <canvas id="debitCreditChart"></canvas>
                 </div>
             </div>
         </div>
@@ -156,9 +175,11 @@
         </div>
     </div>
     <div class="card mt-3">
-        <div class="card-header-custom">
+        <div class="card-header-custom" data-collapse="catTotals" style="cursor: pointer; user-select: none;">
             <h6><i class="bi bi-list-check me-2" style="color: #D97706;"></i>Category Totals</h6>
+            <i class="bi bi-chevron-down" style="color: #94A3B8; font-size: 0.85rem; transition: transform 0.2s;"></i>
         </div>
+        <div class="d-none">
         <div class="table-responsive">
                     <table class="table mb-0" style="font-size: 0.82rem; table-layout: auto;">
                         <thead>
@@ -195,6 +216,7 @@
                     </table>
                 </div>
             </div>
+        </div>
     {% endif %}
 </div>
 
@@ -202,10 +224,13 @@
 <!-- SECTION: Transactions                          -->
 <!-- ══════════════════════════════════════════════ -->
 <div id="section-transactions">
-    <div class="section-title">Transactions</div>
-
     <!-- Table -->
     <div class="card">
+        <div class="card-header-custom" data-collapse="transactions" style="cursor: pointer; user-select: none;">
+            <h6><i class="bi bi-receipt me-2" style="color: #2563EB;"></i>Transactions <span style="font-size: 0.7rem; color: #94A3B8; font-weight: 500;">{{ total }}</span></h6>
+            <i class="bi bi-chevron-down" style="color: #94A3B8; font-size: 0.85rem; transition: transform 0.2s;"></i>
+        </div>
+        <div class="d-none">
         {% if transactions %}
         <div class="table-responsive">
             <table class="table mb-0">
@@ -238,10 +263,13 @@
                             {% endif %}
                         </td>
                         <td style="min-width: 140px;">
+                            {% set cat_colors = ['#E4002B','#2563EB','#16A34A','#D97706','#7C3AED','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'] %}
+                            {% set cat_bgs = ['#FEF2F2','#EFF6FF','#F0FDF4','#FFFBEB','#F5F3FF','#FDF2F8','#ECFEFF','#F7FEE7','#FFF7ED','#EEF2FF'] %}
+                            {% set ci = (categories.index(txn.category) if txn.category and txn.category in categories else -1) %}
                             <div class="category-cell" data-txn-id="{{ txn.id }}" data-merchant="{{ txn.merchant_name or '' }}">
                                 <span class="category-display" onclick="editCategory(this)" data-category="{{ txn.category or '' }}"
                                       style="cursor: pointer; font-size: 0.78rem; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 600;
-                                             {{ 'background: #F8FAFC; color: #CBD5E1;' if not txn.category }}">
+                                             {% if txn.category and ci >= 0 %}background: {{ cat_bgs[ci % 10] }}; color: {{ cat_colors[ci % 10] }};{% elif txn.category %}background: #F1F5F9; color: #475569;{% else %}background: #F8FAFC; color: #CBD5E1;{% endif %}">
                                     {{ txn.category or '+ Add' }}
                                 </span>
                                 <div class="category-edit d-none">
@@ -267,15 +295,16 @@
             <span style="font-size: 0.78rem; color: #94A3B8;">Page {{ page }} of {{ total_pages }}</span>
             <nav>
                 <ul class="pagination pagination-sm mb-0" style="gap: 4px;">
+                    {% set pqs = "&start_date=" ~ filters.start_date ~ "&end_date=" ~ filters.end_date ~ "&type=" ~ filters.type ~ "&category=" ~ filters.category ~ "&statement_id=" ~ filters.statement_id ~ "&statement_type=" ~ filters.statement_type ~ "&search=" ~ filters.search ~ "&period=" ~ filters.period %}
                     <li class="page-item {{ 'disabled' if page == 1 }}">
-                        <a class="page-link" href="?page={{ page - 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&statement_type={{ filters.statement_type }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                        <a class="page-link" href="?page={{ page - 1 }}{{ pqs }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
                     {% for p in range(1, total_pages + 1) %}
                     {% if p == page or (p <= 2) or (p >= total_pages - 1) or (p >= page - 1 and p <= page + 1) %}
                     <li class="page-item {{ 'active' if p == page }}">
-                        <a class="page-link" href="?page={{ p }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&statement_type={{ filters.statement_type }}&search={{ filters.search }}"
+                        <a class="page-link" href="?page={{ p }}{{ pqs }}"
                            style="border-radius: 6px; border: 1px solid {{ '#E4002B' if p == page else '#E2E8F0' }}; {{ 'background: var(--tcb-red); color: #fff;' if p == page else '' }} font-weight: 600; font-size: 0.78rem; min-width: 32px; text-align: center;">{{ p }}</a>
                     </li>
                     {% elif p == 3 or p == total_pages - 2 %}
@@ -283,7 +312,7 @@
                     {% endif %}
                     {% endfor %}
                     <li class="page-item {{ 'disabled' if page == total_pages }}">
-                        <a class="page-link" href="?page={{ page + 1 }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}&type={{ filters.type }}&category={{ filters.category }}&statement_id={{ filters.statement_id }}&statement_type={{ filters.statement_type }}&search={{ filters.search }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
+                        <a class="page-link" href="?page={{ page + 1 }}{{ pqs }}" style="border-radius: 6px; border: 1px solid #E2E8F0; font-weight: 600; font-size: 0.78rem;">
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
@@ -297,7 +326,7 @@
             <div class="empty-icon" style="width: 60px; height: 60px; font-size: 1.5rem; border-radius: 16px; background: linear-gradient(135deg, #DBEAFE, #BFDBFE); color: #2563EB;">
                 <i class="bi bi-search"></i>
             </div>
-            {% if filters.start_date or filters.end_date or filters.type or filters.category or filters.statement_id or filters.statement_type or filters.search %}
+            {% if filters.start_date or filters.end_date or filters.type or filters.category or filters.statement_id or filters.statement_type or filters.search or filters.period %}
             <h5 style="font-size: 1rem;">No matching transactions</h5>
             <p style="font-size: 0.85rem;">Try adjusting your filters.</p>
             <a href="{{ url_for('main.index') }}" class="btn btn-sm" style="background: #F1F5F9; color: var(--tcb-navy); font-weight: 600; border-radius: 8px;">Clear Filters</a>
@@ -307,6 +336,7 @@
             {% endif %}
         </div>
         {% endif %}
+        </div>
     </div>
 </div>
 {% endif %}
@@ -360,26 +390,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const yearlyData = {{ summary.yearly | tojson }};
-    if (yearlyData.length > 0) {
-        new Chart(document.getElementById('yearlyChart'), {
+    const debitCreditCanvas = document.getElementById('debitCreditChart');
+    if (debitCreditCanvas && monthlyData.length > 0) {
+        new Chart(debitCreditCanvas, {
             type: 'bar',
             data: {
-                labels: yearlyData.map(y => y.year),
-                datasets: [{
-                    label: 'Spending',
-                    data: yearlyData.map(y => y.spending),
-                    backgroundColor: yearlyData.map((_, i) => ['#2563EB','#3B82F6','#60A5FA'][i % 3]),
-                    borderRadius: 8, borderSkipped: false, maxBarThickness: 60,
-                }]
+                labels: monthlyData.map(m => {
+                    const [y, mo] = m.month.split('-');
+                    return new Date(y, mo - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+                }),
+                datasets: [
+                    {
+                        label: 'Debit',
+                        data: monthlyData.map(m => m.spending),
+                        backgroundColor: '#E4002B',
+                        borderRadius: 4, borderSkipped: false, maxBarThickness: 32,
+                    },
+                    {
+                        label: 'Credit',
+                        data: monthlyData.map(m => m.income || 0),
+                        backgroundColor: '#16A34A',
+                        borderRadius: 4, borderSkipped: false, maxBarThickness: 32,
+                    }
+                ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: { position: 'bottom', labels: { padding: 10, usePointStyle: true, pointStyle: 'circle', font: { size: 11, weight: '500' } } },
                     tooltip: {
                         backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
-                        callbacks: { label: ctx => new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
+                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
                     }
                 },
                 scales: {
@@ -455,15 +496,18 @@ function getCatColor(name) {
     return { fg: CAT_COLORS[i], bg: CAT_BG[i] };
 }
 
-// Colorize all category badges on load
-document.querySelectorAll('.category-display[data-category]').forEach(el => {
-    const cat = el.dataset.category;
-    if (cat) {
-        const c = getCatColor(cat);
-        el.style.background = c.bg;
-        el.style.color = c.fg;
+// Update color after save
+function updateCatBadgeColor(display, category) {
+    if (category) {
+        const col = getCatColor(category);
+        display.style.background = col.bg;
+        display.style.color = col.fg;
+    } else {
+        display.style.background = '#F8FAFC';
+        display.style.color = '#CBD5E1';
     }
-});
+}
+
 function editCategory(el) {
     const cell = el.closest('.category-cell');
     cell.querySelector('.category-display').classList.add('d-none');
@@ -494,8 +538,8 @@ function saveCategory(input) {
     cell.querySelector('.category-edit').classList.add('d-none');
     display.classList.remove('d-none');
 
-    // Always apply to all transactions with the same merchant
-    const applyToMerchant = !!(merchant && category);
+    // Always apply to this transaction only — rules handle bulk updates
+    const applyToMerchant = false;
 
     fetch('/api/transaction/' + txnId + '/category', {
         method: 'POST',
@@ -505,32 +549,10 @@ function saveCategory(input) {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            if (applyToMerchant && data.updated_count > 1) {
-                // Update all matching merchant cells on the page
-                document.querySelectorAll('.category-cell').forEach(c => {
-                    if (c.dataset.merchant === merchant) {
-                        const d = c.querySelector('.category-display');
-                        d.textContent = category;
-                        d.dataset.category = category;
-                        const col = getCatColor(category);
-                        d.style.background = col ? col.bg : '#F8FAFC';
-                        d.style.color = col ? col.fg : '#CBD5E1';
-                    }
-                });
-                showNotify('Updated ' + data.updated_count + ' transactions from "' + merchant + '"');
-            } else {
-                display.textContent = category || '+ Add';
-                display.dataset.category = category;
-                if (category) {
-                    const col = getCatColor(category);
-                    display.style.background = col.bg;
-                    display.style.color = col.fg;
-                } else {
-                    display.style.background = '#F8FAFC';
-                    display.style.color = '#CBD5E1';
-                }
-                if (category) showNotify('Category saved');
-            }
+            display.textContent = category || '+ Add';
+            display.dataset.category = category;
+            updateCatBadgeColor(display, category);
+            if (category) showNotify('Category saved');
             // Add to datalist if new
             if (category) {
                 const dl = document.getElementById('categoryList');
@@ -545,6 +567,34 @@ function saveCategory(input) {
     })
     .finally(() => { delete input.dataset.saving; });
 }
+
+// Collapsible sections with localStorage persistence
+const COLLAPSE_KEYS = {
+    'catTotals': 'dash_catTotals_open',
+    'transactions': 'dash_transactions_open',
+};
+
+document.querySelectorAll('.card-header-custom[data-collapse]').forEach(header => {
+    const key = header.dataset.collapse;
+    const body = header.nextElementSibling;
+    const chevron = header.querySelector('.bi-chevron-down');
+
+    // Restore saved state (default: transactions open, catTotals closed)
+    const defaults = { catTotals: false, transactions: true };
+    const saved = localStorage.getItem(COLLAPSE_KEYS[key]);
+    const isOpen = saved !== null ? saved === '1' : defaults[key];
+
+    if (isOpen) {
+        body.classList.remove('d-none');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+    }
+
+    header.addEventListener('click', function() {
+        const nowHidden = body.classList.toggle('d-none');
+        if (chevron) chevron.style.transform = nowHidden ? '' : 'rotate(180deg)';
+        localStorage.setItem(COLLAPSE_KEYS[key], nowHidden ? '0' : '1');
+    });
+});
 
 function showNotify(msg) {
     const el = document.createElement('div');
