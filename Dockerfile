@@ -14,15 +14,16 @@ COPY src/ ./src/
 # Install the package
 RUN pip install --no-cache-dir .
 
-# Create a non-root user
+# Create a non-root user and data directory
 RUN useradd -m appuser && \
     mkdir -p /data && \
     chown appuser:appuser /data
 
-USER appuser
+# Copy the database into the image
+COPY techcombank.db /data/techcombank.db
+RUN chown appuser:appuser /data/techcombank.db
 
-# DB and uploaded files live here — mount a volume at /data
-VOLUME /data
+USER appuser
 
 EXPOSE 5000
 
