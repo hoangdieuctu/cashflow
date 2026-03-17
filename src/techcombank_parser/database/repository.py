@@ -129,6 +129,7 @@ class Repository:
         category: str | None = None,
         search: str | None = None,
         statement_id: int | None = None,
+        statement_type: str | None = None,
         limit: int = 500,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
@@ -153,6 +154,9 @@ class Repository:
         if statement_id:
             conditions.append("t.statement_id = ?")
             params.append(statement_id)
+        if statement_type:
+            conditions.append("s.statement_type = ?")
+            params.append(statement_type)
         if search:
             conditions.append("t.description LIKE ?")
             params.append(f"%{search}%")
@@ -243,24 +247,32 @@ class Repository:
         statement_id: int | None = None,
         category: str | None = None,
         search: str | None = None,
+        statement_type: str | None = None,
     ) -> int:
         """Get total number of transactions matching filters."""
         conditions: list[str] = []
         params: list[Any] = []
         if statement_id:
-            conditions.append("statement_id = ?")
+            conditions.append("t.statement_id = ?")
             params.append(statement_id)
+        if statement_type:
+            conditions.append("s.statement_type = ?")
+            params.append(statement_type)
         if category == "__uncategorized__":
-            conditions.append("(category IS NULL OR category = '')")
+            conditions.append("(t.category IS NULL OR t.category = '')")
         elif category:
-            conditions.append("category = ?")
+            conditions.append("t.category = ?")
             params.append(category)
         if search:
-            conditions.append("description LIKE ?")
+            conditions.append("t.description LIKE ?")
             params.append(f"%{search}%")
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         row = self.conn.execute(
-            f"SELECT COUNT(*) as cnt FROM transactions {where}", params
+            f"""SELECT COUNT(*) as cnt
+                FROM transactions t
+                JOIN statements s ON t.statement_id = s.id
+                {where}""",
+            params,
         ).fetchone()
         return row["cnt"]
 

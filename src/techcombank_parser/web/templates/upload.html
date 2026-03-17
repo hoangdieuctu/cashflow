@@ -8,11 +8,12 @@
             <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
                 <div class="up-icon" id="uploadIcon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
                 <h6 id="uploadTitle">Drop PDF here or click to browse</h6>
-                <p id="uploadHint">Techcombank credit card statement</p>
+                <p id="uploadHint">Credit card or bank account statement</p>
                 <div class="file-tag d-none" id="fileTag">
                     <i class="bi bi-file-earmark-pdf-fill" style="color: var(--tcb-red);"></i>
                     <span id="fileName"></span>
                 </div>
+                <div id="detectedBadge" class="d-none" style="margin-top: 0.5rem;"></div>
             </div>
             <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
 
@@ -46,6 +47,17 @@ const uploadTitle = document.getElementById('uploadTitle');
 const uploadHint = document.getElementById('uploadHint');
 const uploadIcon = document.getElementById('uploadIcon');
 const submitBtn = document.getElementById('submitBtn');
+const detectedBadge = document.getElementById('detectedBadge');
+
+function guessType(name) {
+    // Bank account statements from Techcombank online banking are named SaoKeTK_...
+    // Credit card statements follow a different naming convention
+    const lower = name.toLowerCase();
+    if (lower.startsWith('saoke') || lower.includes('sao_ke') || lower.includes('bank_statement')) {
+        return 'bank_account';
+    }
+    return 'credit_card';
+}
 
 function setFile(file) {
     fileNameSpan.textContent = file.name;
@@ -55,6 +67,14 @@ function setFile(file) {
     uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
     dropZone.classList.add('has-file');
     submitBtn.disabled = false;
+
+    const type = guessType(file.name);
+    detectedBadge.classList.remove('d-none');
+    if (type === 'bank_account') {
+        detectedBadge.innerHTML = '<span style="font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:6px;background:#EFF6FF;color:#2563EB;"><i class="bi bi-bank me-1"></i>Debit card statement detected</span>';
+    } else {
+        detectedBadge.innerHTML = '<span style="font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:6px;background:#FEF2F2;color:#E4002B;"><i class="bi bi-credit-card me-1"></i>Credit card statement detected</span>';
+    }
 }
 fileInput.addEventListener('change', function() { if (this.files.length) setFile(this.files[0]); });
 ['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));

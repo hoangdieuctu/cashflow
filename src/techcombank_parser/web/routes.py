@@ -33,13 +33,28 @@ def index():
     category = request.args.get("category")
     statement_id_str = request.args.get("statement_id")
     statement_id = int(statement_id_str) if statement_id_str else None
+    statement_type = request.args.get("statement_type")
     search = request.args.get("search")
     page = int(request.args.get("page", 1))
     per_page = 50
 
     with _get_repo() as repo:
+        all_statements = repo.get_statements()
+
+        # Filter statements list by card type for the dropdown
+        if statement_type:
+            filtered_statements = [s for s in all_statements if s["statement_type"] == statement_type]
+        else:
+            filtered_statements = all_statements
+
+        # Clear statement_id if it doesn't belong to the selected card type
+        if statement_id and statement_type:
+            match = next((s for s in all_statements if s["id"] == statement_id), None)
+            if match and match["statement_type"] != statement_type:
+                statement_id = None
+                statement_id_str = ""
+
         summary = repo.get_spending_summary(statement_id=statement_id, category=category)
-        statements = repo.get_statements()
         txns = repo.get_transactions(
             start_date=start_date,
             end_date=end_date,
@@ -47,10 +62,11 @@ def index():
             category=category,
             search=search,
             statement_id=statement_id,
+            statement_type=statement_type,
             limit=per_page,
             offset=(page - 1) * per_page,
         )
-        total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search)
+        total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search, statement_type=statement_type)
         categories = repo.get_all_categories()
         category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category)
 
@@ -59,7 +75,9 @@ def index():
     return render_template(
         "dashboard.html",
         summary=summary,
-        statements=statements,
+        statements=filtered_statements,
+        has_any_statements=len(all_statements) > 0,
+        total_statements=len(all_statements),
         transactions=txns,
         total=total,
         page=page,
@@ -72,6 +90,7 @@ def index():
             "type": txn_type or "",
             "category": category or "",
             "statement_id": statement_id_str or "",
+            "statement_type": statement_type or "",
             "search": search or "",
         },
     )
@@ -103,7 +122,8 @@ def upload():
             flash(
                 f"No transactions found in {file.filename}. "
                 "The PDF may be password-protected (enter the password above) "
-                "or the statement format is not yet supported.",
+                "or the statement format is not yet supported. "
+                "Supported formats: Techcombank credit card statements and bank account statements (SaoKeTK_...).",
                 "warning",
             )
             return redirect(url_for("main.upload"))
@@ -123,9 +143,14 @@ def upload():
 
             repo.import_parse_result(result)
 
+        stmt_type_label = (
+            "bank account (debit card)"
+            if result.metadata.statement_type.value == "bank_account"
+            else "credit card"
+        )
         flash(
             f"Successfully imported {result.transaction_count} transactions "
-            f"from {file.filename}.",
+            f"from {file.filename} ({stmt_type_label}).",
             "success",
         )
 
