@@ -5,7 +5,4 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - techcombank_data:/data
-
-volumes:
-  techcombank_data:
+      - ./data:/data
