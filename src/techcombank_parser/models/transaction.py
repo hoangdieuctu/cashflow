@@ -1,4 +1,4 @@
-"""Pydantic models for Techcombank credit card statement data."""
+"""Pydantic models for Techcombank statement data."""
 
 from __future__ import annotations
 
@@ -15,8 +15,13 @@ class TransactionType(str, Enum):
     CREDIT = "credit"
 
 
+class StatementType(str, Enum):
+    CREDIT_CARD = "credit_card"
+    BANK_ACCOUNT = "bank_account"
+
+
 class Transaction(BaseModel):
-    """A single credit card transaction."""
+    """A single transaction from any statement type."""
 
     transaction_date: date
     posting_date: Optional[date] = None
@@ -29,6 +34,7 @@ class Transaction(BaseModel):
     merchant_name: Optional[str] = None
     card_last_four: Optional[str] = None
     reference_number: Optional[str] = None
+    running_balance: Optional[Decimal] = None
 
     model_config = {"json_encoders": {Decimal: str, date: lambda v: v.strftime("%d/%m/%Y")}}
 
@@ -36,6 +42,7 @@ class Transaction(BaseModel):
 class StatementMetadata(BaseModel):
     """Metadata extracted from the statement header."""
 
+    statement_type: StatementType = StatementType.CREDIT_CARD
     statement_date: Optional[date] = None
     due_date: Optional[date] = None
     min_payment: Optional[Decimal] = None
@@ -45,6 +52,10 @@ class StatementMetadata(BaseModel):
     card_holder_name: Optional[str] = None
     statement_period_start: Optional[date] = None
     statement_period_end: Optional[date] = None
+    # Bank account statement fields
+    account_number: Optional[str] = None
+    opening_balance: Optional[Decimal] = None
+    ending_balance: Optional[Decimal] = None
     source_file: Optional[str] = None
 
 

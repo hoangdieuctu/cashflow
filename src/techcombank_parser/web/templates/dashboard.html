@@ -10,7 +10,7 @@
     <div class="empty-state" style="padding: 3.5rem 2rem;">
         <div class="empty-icon"><i class="bi bi-credit-card-2-front"></i></div>
         <h5>No statements imported yet</h5>
-        <p>Upload your first Techcombank credit card statement to see spending analytics and transaction history.</p>
+        <p>Upload your first Techcombank credit card or bank account statement to see spending analytics and transaction history.</p>
         <a href="{{ url_for('main.upload') }}" class="btn btn-sm" style="background: linear-gradient(135deg, var(--tcb-red), #FF4D6D); color: #fff; border-radius: 10px; font-weight: 700; padding: 0.6rem 1.5rem;">
             <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Statement
         </a>
@@ -29,7 +29,10 @@
             <select class="form-select form-select-sm" name="statement_id" onchange="this.form.submit()" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
                 <option value="">All statements</option>
                 {% for stmt in statements %}
-                <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>{{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:30] }} ({{ stmt.transaction_count }} txns)</option>
+                <option value="{{ stmt.id }}" {{ 'selected' if filters.statement_id == stmt.id|string }}>
+                    {% if stmt.statement_type == 'bank_account' %}[Debit]{% else %}[Credit]{% endif %}
+                    {{ stmt.statement_date or 'N/A' }} — {{ stmt.source_file[:28] }} ({{ stmt.transaction_count }} txns)
+                </option>
                 {% endfor %}
             </select>
         </div>
@@ -204,6 +207,7 @@
                         <th>Description</th>
                         <th class="text-end">Amount (VND)</th>
                         <th class="text-center">Type</th>
+                        <th class="text-center">Source</th>
                         <th>Category</th>
                     </tr>
                 </thead>
@@ -218,6 +222,13 @@
                             {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
                         </td>
                         <td class="text-center"><span class="badge-{{ txn.transaction_type }}">{{ txn.transaction_type }}</span></td>
+                        <td class="text-center">
+                            {% if txn.statement_type == 'bank_account' %}
+                            <span style="font-size:0.68rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:5px;background:#EFF6FF;color:#2563EB;">Debit Card</span>
+                            {% else %}
+                            <span style="font-size:0.68rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:5px;background:#FEF2F2;color:#E4002B;">Credit Card</span>
+                            {% endif %}
+                        </td>
                         <td style="min-width: 140px;">
                             <div class="category-cell" data-txn-id="{{ txn.id }}" data-merchant="{{ txn.merchant_name or '' }}">
                                 <span class="category-display" onclick="editCategory(this)" data-category="{{ txn.category or '' }}"

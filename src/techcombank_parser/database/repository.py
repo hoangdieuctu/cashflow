@@ -11,6 +11,7 @@ from techcombank_parser.database.db import init_db
 from techcombank_parser.models.transaction import (
     ParseResult,
     StatementMetadata,
+    StatementType,
     Transaction,
     TransactionType,
 )
@@ -39,12 +40,14 @@ class Repository:
         meta = result.metadata
         cursor = self.conn.execute(
             """INSERT OR REPLACE INTO statements
-               (source_file, statement_date, due_date, card_number_masked,
+               (source_file, statement_type, statement_date, due_date, card_number_masked,
                 card_holder_name, total_due, min_payment, credit_limit,
-                period_start, period_end, page_count, parse_method)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                period_start, period_end, account_number, opening_balance,
+                ending_balance, page_count, parse_method)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 meta.source_file or "unknown",
+                meta.statement_type.value,
                 _date_str(meta.statement_date),
                 _date_str(meta.due_date),
                 meta.card_number_masked,
@@ -54,6 +57,9 @@ class Repository:
                 _decimal_str(meta.credit_limit),
                 _date_str(meta.statement_period_start),
                 _date_str(meta.statement_period_end),
+                meta.account_number,
+                _decimal_str(meta.opening_balance),
+                _decimal_str(meta.ending_balance),
                 result.page_count,
                 result.parse_method,
             ),
@@ -72,8 +78,8 @@ class Repository:
                    (statement_id, transaction_date, posting_date, description,
                     original_amount, original_currency, billing_amount_vnd,
                     transaction_type, category, merchant_name, card_last_four,
-                    reference_number)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    reference_number, running_balance)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     statement_id,
                     _date_str(txn.transaction_date),
@@ -87,6 +93,7 @@ class Repository:
                     txn.merchant_name,
                     txn.card_last_four,
                     txn.reference_number,
+                    _decimal_str(txn.running_balance),
                 ),
             )
 
@@ -153,7 +160,8 @@ class Repository:
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         rows = self.conn.execute(
-            f"""SELECT t.*, s.source_file, s.statement_date as stmt_date
+            f"""SELECT t.*, s.source_file, s.statement_date as stmt_date,
+                       s.statement_type
                 FROM transactions t
                 JOIN statements s ON t.statement_id = s.id
                 {where}

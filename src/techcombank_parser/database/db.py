@@ -11,6 +11,7 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS statements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_file TEXT NOT NULL,
+    statement_type TEXT NOT NULL DEFAULT 'credit_card' CHECK(statement_type IN ('credit_card', 'bank_account')),
     statement_date TEXT,
     due_date TEXT,
     card_number_masked TEXT,
@@ -20,6 +21,9 @@ CREATE TABLE IF NOT EXISTS statements (
     credit_limit TEXT,
     period_start TEXT,
     period_end TEXT,
+    account_number TEXT,
+    opening_balance TEXT,
+    ending_balance TEXT,
     page_count INTEGER,
     parse_method TEXT,
     imported_at TEXT DEFAULT (datetime('now')),
@@ -40,6 +44,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     merchant_name TEXT,
     card_last_four TEXT,
     reference_number TEXT,
+    running_balance TEXT,
     FOREIGN KEY (statement_id) REFERENCES statements(id) ON DELETE CASCADE
 );
 
@@ -75,5 +80,34 @@ def init_db(db_path: str | Path | None = None) -> sqlite3.Connection:
     """Initialize database with schema and return connection."""
     conn = get_connection(db_path)
     conn.executescript(SCHEMA_SQL)
+    _migrate(conn)
     conn.commit()
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply incremental migrations for columns added after initial schema."""
+    existing_stmt_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(statements)").fetchall()
+    }
+    existing_txn_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(transactions)").fetchall()
+    }
+
+    migrations = []
+
+    if "statement_type" not in existing_stmt_cols:
+        migrations.append(
+            "ALTER TABLE statements ADD COLUMN statement_type TEXT NOT NULL DEFAULT 'credit_card'"
+        )
+    if "account_number" not in existing_stmt_cols:
+        migrations.append("ALTER TABLE statements ADD COLUMN account_number TEXT")
+    if "opening_balance" not in existing_stmt_cols:
+        migrations.append("ALTER TABLE statements ADD COLUMN opening_balance TEXT")
+    if "ending_balance" not in existing_stmt_cols:
+        migrations.append("ALTER TABLE statements ADD COLUMN ending_balance TEXT")
+    if "running_balance" not in existing_txn_cols:
+        migrations.append("ALTER TABLE transactions ADD COLUMN running_balance TEXT")
+
+    for sql in migrations:
+        conn.execute(sql)
