@@ -1,7 +1,7 @@
 services:
   app:
     container_name: techcombank-parser
-    image: techcombank-parser
+    image: hoangdieuctu/techcombank-parser
     ports:
       - "5000:5000"
     volumes:
