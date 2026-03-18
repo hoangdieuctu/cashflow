@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E4002B"/>
+      <stop offset="100%" style="stop-color:#FF4D6D"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#bg)"/>
+  <!-- Cash flow arrow up-right -->
+  <polyline points="5,22 11,14 17,18 27,8" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Arrow head -->
+  <polyline points="21,8 27,8 27,14" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Dollar sign base line -->
+  <line x1="5" y1="26" x2="20" y2="26" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"/>
+</svg>
