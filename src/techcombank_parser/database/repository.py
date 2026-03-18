@@ -453,11 +453,28 @@ class Repository:
         self.conn.commit()
         return cursor.lastrowid
 
-    def update_rule(self, rule_id: int, category: str) -> bool:
-        """Update the category of a rule. Returns True if updated."""
+    def update_rule(self, rule_id: int, category: str | None = None, match_type: str | None = None, pattern: str | None = None, priority: int | None = None) -> bool:
+        """Update fields of a rule. Returns True if updated."""
+        fields = []
+        params = []
+        if category is not None:
+            fields.append("category = ?")
+            params.append(category.strip())
+        if match_type is not None:
+            fields.append("match_type = ?")
+            params.append(match_type.strip())
+        if pattern is not None:
+            fields.append("pattern = ?")
+            params.append(pattern.strip())
+        if priority is not None:
+            fields.append("priority = ?")
+            params.append(priority)
+        if not fields:
+            return False
+        params.append(rule_id)
         cursor = self.conn.execute(
-            "UPDATE category_rules SET category = ? WHERE id = ?",
-            (category.strip(), rule_id),
+            f"UPDATE category_rules SET {', '.join(fields)} WHERE id = ?",
+            params,
         )
         self.conn.commit()
         return cursor.rowcount > 0
@@ -467,6 +484,27 @@ class Repository:
         cursor = self.conn.execute("DELETE FROM category_rules WHERE id = ?", (rule_id,))
         self.conn.commit()
         return cursor.rowcount > 0
+
+    def get_rule_stats(self) -> dict[int, int]:
+        """Return a mapping of rule_id -> transaction count matched by that rule."""
+        rules = self.get_rules()
+        stats: dict[int, int] = {}
+        for rule in rules:
+            match_type = rule["match_type"]
+            pattern = rule["pattern"]
+            if match_type == "contains":
+                param = f"%{pattern}%"
+            elif match_type == "endswith":
+                param = f"%{pattern}"
+            else:
+                stats[rule["id"]] = 0
+                continue
+            row = self.conn.execute(
+                "SELECT COUNT(*) as cnt FROM transactions WHERE description LIKE ?",
+                (param,),
+            ).fetchone()
+            stats[rule["id"]] = row["cnt"]
+        return stats
 
     def apply_rules(self, statement_id: int | None = None) -> int:
         """Apply all category rules to uncategorized transactions.

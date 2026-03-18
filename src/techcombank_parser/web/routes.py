@@ -119,73 +119,69 @@ def index():
 
 @bp.route("/upload", methods=["GET", "POST"])
 def upload():
-    """Upload and parse a PDF statement."""
+    """Upload and parse one or more PDF statements."""
     if request.method == "GET":
         return render_template("upload.html")
 
-    file = request.files.get("pdf_file")
-    if not file or not file.filename or not file.filename.lower().endswith(".pdf"):
-        flash("Please upload a valid PDF file.", "error")
+    files = request.files.getlist("pdf_file")
+    files = [f for f in files if f and f.filename and f.filename.lower().endswith(".pdf")]
+    if not files:
+        flash("Please upload at least one valid PDF file.", "error")
         return redirect(url_for("main.upload"))
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        file.save(tmp.name)
-        tmp_path = Path(tmp.name)
+    password = request.form.get("password") or None
+    any_success = False
 
-    try:
-        from techcombank_parser.parser.statement_parser import parse_statement
+    for file in files:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = Path(tmp.name)
 
-        password = request.form.get("password") or None
-        result = parse_statement(tmp_path, password=password)
-        result.metadata.source_file = file.filename
+        try:
+            from techcombank_parser.parser.statement_parser import parse_statement
 
-        if result.transaction_count == 0:
-            flash(
-                f"No transactions found in {file.filename}. "
-                "The PDF may be password-protected (enter the password above) "
-                "or the statement format is not yet supported. "
-                "Supported formats: Techcombank credit card statements and bank account statements (SaoKeTK_...).",
-                "warning",
-            )
-            return redirect(url_for("main.upload"))
+            result = parse_statement(tmp_path, password=password)
+            result.metadata.source_file = file.filename
 
-        with _get_repo() as repo:
-            # Check if this statement was already imported
-            existing = repo.conn.execute(
-                "SELECT id FROM statements WHERE source_file = ?",
-                (file.filename,),
-            ).fetchone()
-            if existing:
+            if result.transaction_count == 0:
                 flash(
-                    f"{file.filename} has already been imported.",
-                    "error",
+                    f"No transactions found in {file.filename}. "
+                    "The PDF may be password-protected or the format is not yet supported.",
+                    "warning",
                 )
-                return redirect(url_for("main.upload"))
+                continue
 
-            repo.import_parse_result(result)
+            with _get_repo() as repo:
+                existing = repo.conn.execute(
+                    "SELECT id FROM statements WHERE source_file = ?",
+                    (file.filename,),
+                ).fetchone()
+                if existing:
+                    flash(f"{file.filename} has already been imported.", "error")
+                    continue
 
-        stmt_type_label = (
-            "bank account (debit card)"
-            if result.metadata.statement_type.value == "bank_account"
-            else "credit card"
-        )
-        flash(
-            f"Successfully imported {result.transaction_count} transactions "
-            f"from {file.filename} ({stmt_type_label}).",
-            "success",
-        )
+                repo.import_parse_result(result)
 
-        if result.warnings:
-            for w in result.warnings:
-                flash(w, "warning")
+            stmt_type_label = (
+                "bank account (debit card)"
+                if result.metadata.statement_type.value == "bank_account"
+                else "credit card"
+            )
+            flash(
+                f"Imported {result.transaction_count} transactions from {file.filename} ({stmt_type_label}).",
+                "success",
+            )
+            if result.warnings:
+                for w in result.warnings:
+                    flash(w, "warning")
+            any_success = True
 
-    except Exception as e:
-        flash(f"Error parsing PDF: {e}", "error")
-        return redirect(url_for("main.upload"))
-    finally:
-        tmp_path.unlink(missing_ok=True)
+        except Exception as e:
+            flash(f"Error parsing {file.filename}: {e}", "error")
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
-    return redirect(url_for("main.index"))
+    return redirect(url_for("main.index") if any_success else url_for("main.upload"))
 
 
 @bp.route("/rules", methods=["GET"])
@@ -194,7 +190,8 @@ def rules():
     with _get_repo() as repo:
         all_rules = repo.get_rules()
         categories = repo.get_all_categories()
-    return render_template("rules.html", rules=all_rules, categories=categories)
+        stats = repo.get_rule_stats()
+    return render_template("rules.html", rules=all_rules, categories=categories, stats=stats)
 
 
 @bp.route("/api/rules", methods=["POST"])
@@ -231,18 +228,26 @@ def delete_rule(rule_id: int):
 
 @bp.route("/api/rules/<int:rule_id>", methods=["PUT"])
 def update_rule(rule_id: int):
-    """Update a category rule's category."""
+    """Update a category rule's fields."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "JSON body required"}), 400
-    category = (data.get("category") or "").strip()
-    if not category:
-        return jsonify({"error": "category is required"}), 400
+
+    category = (data.get("category") or "").strip() or None
+    match_type = (data.get("match_type") or "").strip() or None
+    pattern = (data.get("pattern") or "").strip() or None
+    priority = data.get("priority")
+
+    if match_type and match_type not in ("contains", "endswith"):
+        return jsonify({"error": "match_type must be 'contains' or 'endswith'"}), 400
+    if priority is not None:
+        priority = int(priority)
+
     with _get_repo() as repo:
-        ok = repo.update_rule(rule_id, category)
+        ok = repo.update_rule(rule_id, category=category, match_type=match_type, pattern=pattern, priority=priority)
     if not ok:
         return jsonify({"error": "Rule not found"}), 404
-    return jsonify({"ok": True, "category": category})
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/rules/apply", methods=["POST"])

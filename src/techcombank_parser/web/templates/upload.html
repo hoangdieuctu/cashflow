@@ -7,15 +7,11 @@
         <form method="post" enctype="multipart/form-data" id="uploadForm">
             <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
                 <div class="up-icon" id="uploadIcon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
-                <h6 id="uploadTitle">Drop PDF here or click to browse</h6>
-                <p id="uploadHint">Credit card or bank account statement</p>
-                <div class="file-tag d-none" id="fileTag">
-                    <i class="bi bi-file-earmark-pdf-fill" style="color: var(--tcb-red);"></i>
-                    <span id="fileName"></span>
-                </div>
-                <div id="detectedBadge" class="d-none" style="margin-top: 0.5rem;"></div>
+                <h6 id="uploadTitle">Drop PDFs here or click to browse</h6>
+                <p id="uploadHint">Credit card or bank account statements · multiple files supported</p>
+                <div id="fileList" style="display:none; margin-top: 0.6rem; width: 100%; text-align: left;"></div>
             </div>
-            <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none">
+            <input type="file" name="pdf_file" id="fileInput" accept=".pdf" class="d-none" multiple>
 
             <div class="input-group input-group-sm mt-3">
                 <span class="input-group-text" style="border-radius: 8px 0 0 8px; border-color: #E2E8F0; background: #F8FAFC;">
@@ -25,7 +21,7 @@
             </div>
 
             <button type="submit" class="btn upload-btn w-100 mt-3" id="submitBtn" disabled>
-                <i class="bi bi-lightning-fill me-1"></i> Parse & Import
+                <i class="bi bi-lightning-fill me-1"></i> <span id="submitLabel">Parse & Import</span>
             </button>
 
             <div class="d-flex gap-3 justify-content-center mt-2" style="color: #94A3B8; font-size: 0.72rem;">
@@ -41,17 +37,14 @@
 <script>
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
-const fileTag = document.getElementById('fileTag');
-const fileNameSpan = document.getElementById('fileName');
+const fileList = document.getElementById('fileList');
 const uploadTitle = document.getElementById('uploadTitle');
 const uploadHint = document.getElementById('uploadHint');
 const uploadIcon = document.getElementById('uploadIcon');
 const submitBtn = document.getElementById('submitBtn');
-const detectedBadge = document.getElementById('detectedBadge');
+const submitLabel = document.getElementById('submitLabel');
 
 function guessType(name) {
-    // Bank account statements from Techcombank online banking are named SaoKeTK_...
-    // Credit card statements follow a different naming convention
     const lower = name.toLowerCase();
     if (lower.startsWith('saoke') || lower.includes('sao_ke') || lower.includes('bank_statement')) {
         return 'bank_account';
@@ -59,30 +52,57 @@ function guessType(name) {
     return 'credit_card';
 }
 
-function setFile(file) {
-    fileNameSpan.textContent = file.name;
-    fileTag.classList.remove('d-none');
-    uploadTitle.textContent = 'File selected';
-    uploadHint.textContent = 'Click to change';
-    uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
-    dropZone.classList.add('has-file');
-    submitBtn.disabled = false;
-
-    const type = guessType(file.name);
-    detectedBadge.classList.remove('d-none');
-    if (type === 'bank_account') {
-        detectedBadge.innerHTML = '<span style="font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:6px;background:#EFF6FF;color:#2563EB;"><i class="bi bi-bank me-1"></i>Debit card statement detected</span>';
-    } else {
-        detectedBadge.innerHTML = '<span style="font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:6px;background:#FEF2F2;color:#E4002B;"><i class="bi bi-credit-card me-1"></i>Credit card statement detected</span>';
+function renderFiles(files) {
+    if (!files.length) {
+        fileList.style.display = 'none';
+        dropZone.classList.remove('has-file');
+        uploadIcon.innerHTML = '<i class="bi bi-cloud-arrow-up-fill"></i>';
+        uploadTitle.textContent = 'Drop PDFs here or click to browse';
+        uploadHint.textContent = 'Credit card or bank account statements · multiple files supported';
+        submitBtn.disabled = true;
+        submitLabel.textContent = 'Parse & Import';
+        return;
     }
+
+    dropZone.classList.add('has-file');
+    uploadIcon.innerHTML = '<i class="bi bi-file-earmark-check-fill"></i>';
+    uploadTitle.textContent = files.length === 1 ? '1 file selected' : files.length + ' files selected';
+    uploadHint.textContent = 'Click to change';
+    submitBtn.disabled = false;
+    submitLabel.textContent = files.length === 1 ? 'Parse & Import' : 'Parse & Import All (' + files.length + ')';
+
+    fileList.style.display = 'flex';
+    fileList.style.flexDirection = 'column';
+    fileList.style.gap = '0.35rem';
+    fileList.innerHTML = '';
+
+    Array.from(files).forEach(f => {
+        const type = guessType(f.name);
+        const badge = type === 'bank_account'
+            ? '<span style="font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:5px;background:#EFF6FF;color:#2563EB;"><i class="bi bi-bank me-1"></i>Debit</span>'
+            : '<span style="font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:5px;background:#FEF2F2;color:#E4002B;"><i class="bi bi-credit-card me-1"></i>Credit</span>';
+        const tag = document.createElement('div');
+        tag.style.cssText = 'display:flex;align-items:center;gap:0.5rem;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:0.35rem 0.7rem;font-size:0.8rem;font-weight:600;color:var(--tcb-navy);';
+        tag.innerHTML = `<i class="bi bi-file-earmark-pdf-fill" style="color:var(--tcb-red);flex-shrink:0;"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span>${badge}`;
+        fileList.appendChild(tag);
+    });
 }
-fileInput.addEventListener('change', function() { if (this.files.length) setFile(this.files[0]); });
+
+fileInput.addEventListener('change', function() { renderFiles(this.files); });
+
 ['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
 ['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
 dropZone.addEventListener('drop', ev => {
-    const f = ev.dataTransfer.files;
-    if (f.length && f[0].name.toLowerCase().endsWith('.pdf')) { fileInput.files = f; setFile(f[0]); }
+    const pdfs = Array.from(ev.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (pdfs.length) {
+        // Use DataTransfer to set multiple files on input
+        const dt = new DataTransfer();
+        pdfs.forEach(f => dt.items.add(f));
+        fileInput.files = dt.files;
+        renderFiles(fileInput.files);
+    }
 });
+
 document.getElementById('uploadForm').addEventListener('submit', function() {
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Parsing...';

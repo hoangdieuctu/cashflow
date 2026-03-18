@@ -7,7 +7,7 @@
     <div class="col-lg-5">
         <div class="card" style="padding: 1.5rem;">
             <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 1rem;">
-                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>Add Rule
+                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>Add Patterns
             </h6>
             <form id="addRuleForm">
                 <div class="mb-3">
@@ -18,8 +18,12 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Pattern</label>
-                    <input type="text" class="form-control form-control-sm" id="pattern" placeholder="e.g. VINMEC, STARBUCKS..." style="border-radius: 8px; border-color: #E2E8F0;" required>
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Patterns <span style="font-weight: 400; text-transform: none;">(one per line or comma-separated)</span>
+                    </label>
+                    <textarea class="form-control form-control-sm" id="pattern" rows="3"
+                        placeholder="e.g. VINMEC&#10;STARBUCKS&#10;GRAB"
+                        style="border-radius: 8px; border-color: #E2E8F0; font-family: monospace; font-size: 0.85rem; resize: vertical;" required></textarea>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Category</label>
@@ -35,7 +39,7 @@
                     <input type="number" class="form-control form-control-sm" id="priority" value="0" style="border-radius: 8px; border-color: #E2E8F0; width: 100px;">
                 </div>
                 <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 600; padding: 0.5rem;">
-                    <i class="bi bi-plus-lg me-1"></i> Add Rule
+                    <i class="bi bi-plus-lg me-1"></i> Add
                 </button>
             </form>
 
@@ -47,7 +51,7 @@
         </div>
     </div>
 
-    <!-- Rules List -->
+    <!-- Rules List grouped by category -->
     <div class="col-lg-7">
         <div class="card">
             <div class="card-header-custom">
@@ -59,47 +63,94 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="table-responsive">
-                <table class="table mb-0" id="rulesTable">
-                    <thead>
-                        <tr>
-                            <th>Match</th>
-                            <th>Pattern</th>
-                            <th>Category</th>
-                            <th class="text-center">Priority</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for rule in rules %}
-                        <tr id="rule-{{ rule.id }}">
-                            <td>
-                                <span style="font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 5px; font-weight: 600;
-                                    {{ 'background: #EFF6FF; color: #2563EB;' if rule.match_type == 'contains' else 'background: #F5F3FF; color: #7C3AED;' }}">
-                                    {{ rule.match_type }}
-                                </span>
-                            </td>
-                            <td style="font-weight: 600; font-family: monospace; font-size: 0.85rem;">{{ rule.pattern }}</td>
-                            <td class="rule-cat-cell" data-rule-id="{{ rule.id }}">
-                                <span class="rule-cat-badge" onclick="editRuleCat(this)" style="font-size: 0.78rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; background: #F0FDF4; color: #16A34A; cursor: pointer;" title="Click to edit">{{ rule.category }}</span>
-                                <input type="text" class="rule-cat-input form-control form-control-sm" list="categoryList" value="{{ rule.category }}" onkeydown="ruleCatKey(event,this)" onblur="ruleCatBlur(this)" style="display:none; border-radius: 6px; border-color: #86EFAC; font-size: 0.78rem; font-weight: 600; color: #16A34A; width: 130px; padding: 0.1rem 0.4rem;">
-                            </td>
-                            <td class="text-center" style="color: #94A3B8;">{{ rule.priority }}</td>
-                            <td class="text-end">
-                                <button onclick="deleteRule({{ rule.id }})" class="btn btn-sm" style="color: #DC2626; padding: 0.15rem 0.4rem; font-size: 0.75rem;">
-                                    <i class="bi bi-trash3"></i>
+            <div style="padding: 0.75rem 1rem;" id="rulesContainer">
+                {# Group rules by category #}
+                {% set ns = namespace(groups={}) %}
+                {% for rule in rules %}
+                    {% if rule.category not in ns.groups %}
+                        {% set _ = ns.groups.update({rule.category: []}) %}
+                    {% endif %}
+                    {% set _ = ns.groups[rule.category].append(rule) %}
+                {% endfor %}
+
+                {% if rules %}
+                    {% for cat, cat_rules in ns.groups.items() %}
+                    <div class="rule-group mb-2" data-category="{{ cat }}" style="border: 1px solid #E2E8F0; border-radius: 10px; padding: 0.75rem 1rem;">
+                        <!-- View mode -->
+                        <div class="group-view">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="rule-cat-label" style="font-weight: 700; font-size: 0.85rem; color: #16A34A; background: #F0FDF4; padding: 0.2rem 0.6rem; border-radius: 6px;">{{ cat }}</span>
+                                    <span style="font-size: 0.7rem; color: #94A3B8;">{{ cat_rules[0].match_type }} · priority {{ cat_rules[0].priority }}</span>
+                                </div>
+                                <button onclick="openGroupEdit(this)" class="btn btn-sm" style="color: #64748B; padding: 0.15rem 0.5rem; font-size: 0.75rem; border: 1px solid #E2E8F0; border-radius: 6px;">
+                                    <i class="bi bi-pencil me-1"></i>Edit
                                 </button>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr id="emptyRow">
-                            <td colspan="5" class="text-center py-4" style="color: #94A3B8;">
-                                No rules defined. Add a rule to auto-categorize transactions.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                            <div class="pattern-list d-flex flex-column gap-1">
+                                {% for rule in cat_rules %}
+                                {% set txn_count = stats.get(rule.id, 0) %}
+                                <div class="pattern-row d-flex align-items-center gap-2" data-rule-id="{{ rule.id }}">
+                                    <span class="pattern-tag" style="display:inline-flex;align-items:center;background:#EFF6FF;color:#2563EB;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;font-family:monospace;font-weight:600;">{{ rule.pattern }}</span>
+                                    <span class="txn-count" style="font-size:0.72rem;color:{% if txn_count > 0 %}#059669{% else %}#94A3B8{% endif %};font-weight:600;">
+                                        <i class="bi bi-receipt me-1"></i>{{ txn_count }} txn{{ 's' if txn_count != 1 }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Edit mode (hidden) -->
+                        <div class="group-edit" style="display:none;">
+                            <div class="d-flex gap-2 flex-wrap mb-3">
+                                <div>
+                                    <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Match</label>
+                                    <select class="form-select form-select-sm edit-match" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:130px;">
+                                        <option value="contains" {% if cat_rules[0].match_type == 'contains' %}selected{% endif %}>contains</option>
+                                        <option value="endswith" {% if cat_rules[0].match_type == 'endswith' %}selected{% endif %}>ends with</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Category</label>
+                                    <input type="text" class="form-control form-control-sm edit-category" list="categoryList" value="{{ cat }}" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:140px;">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Priority</label>
+                                    <input type="number" class="form-control form-control-sm edit-priority" value="{{ cat_rules[0].priority }}" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:70px;">
+                                </div>
+                            </div>
+
+                            <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;margin-bottom:0.4rem;">Patterns</label>
+                            <div class="edit-patterns-wrap d-flex flex-wrap gap-1 mb-2" style="min-height:32px;padding:0.4rem;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">
+                                {% for rule in cat_rules %}
+                                <span class="edit-pattern-chip" data-rule-id="{{ rule.id }}" data-action="keep"
+                                    style="display:inline-flex;align-items:center;gap:0.3rem;background:#EFF6FF;color:#2563EB;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.8rem;font-family:monospace;font-weight:600;cursor:default;">
+                                    {{ rule.pattern }}
+                                    <button type="button" onclick="removeChip(this)" style="background:none;border:none;padding:0;color:#93C5FD;cursor:pointer;font-size:0.7rem;line-height:1;" title="Remove">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </span>
+                                {% endfor %}
+                            </div>
+                            <div class="d-flex gap-2 mb-3">
+                                <input type="text" class="form-control form-control-sm new-pattern-input" placeholder="Add pattern..." style="border-radius:6px;border-color:#E2E8F0;font-family:monospace;font-size:0.82rem;">
+                                <button type="button" onclick="addChip(this)" class="btn btn-sm" style="background:#EFF6FF;color:#2563EB;border-radius:6px;font-size:0.8rem;padding:0.3rem 0.7rem;white-space:nowrap;flex-shrink:0;">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" onclick="saveGroupEdit(this)" class="btn btn-sm" style="background:var(--tcb-navy);color:#fff;border-radius:6px;font-size:0.8rem;padding:0.35rem 0.9rem;font-weight:600;">Save</button>
+                                <button type="button" onclick="cancelGroupEdit(this)" class="btn btn-sm" style="border:1px solid #E2E8F0;border-radius:6px;font-size:0.8rem;padding:0.35rem 0.7rem;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div id="emptyState" class="text-center py-4" style="color: #94A3B8;">
+                    No rules defined. Add patterns above to auto-categorize transactions.
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -108,128 +159,338 @@
 
 {% block scripts %}
 <script>
+// ── Add new rule group ──────────────────────────────────────────────
 document.getElementById('addRuleForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    const data = {
-        match_type: document.getElementById('matchType').value,
-        pattern: document.getElementById('pattern').value.trim(),
-        category: document.getElementById('category').value.trim(),
-        priority: parseInt(document.getElementById('priority').value) || 0,
-    };
-    if (!data.pattern || !data.category) return;
+    const matchType = document.getElementById('matchType').value;
+    const rawPatterns = document.getElementById('pattern').value;
+    const category = document.getElementById('category').value.trim();
+    const priority = parseInt(document.getElementById('priority').value) || 0;
 
-    fetch('/api/rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(res => {
-        if (res.ok) {
-            location.reload();
-        } else {
-            showNotify(res.error || 'Failed to add rule');
+    if (!rawPatterns.trim() || !category) return;
+
+    const patterns = [...new Set(
+        rawPatterns.split(/[\n,]+/).map(p => p.trim()).filter(p => p)
+    )];
+    if (patterns.length === 0) return;
+
+    const btn = this.querySelector('button[type=submit]');
+    btn.disabled = true;
+    let added = 0;
+    const addedRules = []; // {id, pattern}
+    const errors = [];
+
+    function addNext(i) {
+        if (i >= patterns.length) {
+            btn.disabled = false;
+            if (added > 0) {
+                document.getElementById('pattern').value = '';
+                showNotify('Added ' + added + ' pattern' + (added !== 1 ? 's' : '') + ' for <strong>' + category + '</strong>');
+                addedRules.forEach(r => addPatternToGroup(r.id, category, matchType, priority, r.pattern, 0));
+            }
+            if (errors.length) showNotify('Some patterns failed: ' + errors.join(', '));
+            updateCount();
+            return;
         }
-    });
+        fetch('/api/rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ match_type: matchType, pattern: patterns[i], category, priority })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.ok) { added++; addedRules.push({ id: res.id, pattern: patterns[i] }); }
+            else errors.push(patterns[i]);
+            addNext(i + 1);
+        })
+        .catch(() => { errors.push(patterns[i]); addNext(i + 1); });
+    }
+    addNext(0);
 });
 
-function deleteRule(id) {
-    fetch('/api/rules/' + id, { method: 'DELETE' })
-    .then(r => r.json())
-    .then(res => {
-        if (res.ok) {
-            const row = document.getElementById('rule-' + id);
-            if (row) row.remove();
-            // Check if table is empty
-            const tbody = document.querySelector('#rulesTable tbody');
-            if (!tbody.querySelector('tr')) {
-                tbody.innerHTML = '<tr id="emptyRow"><td colspan="5" class="text-center py-4" style="color: #94A3B8;">No rules defined.</td></tr>';
-            }
-        }
+function addPatternToGroup(ruleId, category, matchType, priority, pattern, txnCount) {
+    const container = document.getElementById('rulesContainer');
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    let group = container.querySelector(`.rule-group[data-category="${CSS.escape(category)}"]`);
+    if (!group) {
+        group = document.createElement('div');
+        group.className = 'rule-group mb-2';
+        group.dataset.category = category;
+        group.style.cssText = 'border:1px solid #E2E8F0;border-radius:10px;padding:0.75rem 1rem;';
+        group.innerHTML = buildGroupHTML(category, matchType, priority, []);
+        container.appendChild(group);
+    }
+
+    // Add to view list
+    const list = group.querySelector('.pattern-list');
+    const countColor = txnCount > 0 ? '#059669' : '#94A3B8';
+    const row = document.createElement('div');
+    row.className = 'pattern-row d-flex align-items-center gap-2';
+    row.dataset.ruleId = ruleId;
+    row.innerHTML = `<span class="pattern-tag" style="display:inline-flex;align-items:center;background:#EFF6FF;color:#2563EB;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;font-family:monospace;font-weight:600;">${pattern}</span>
+        <span class="txn-count" style="font-size:0.72rem;color:${countColor};font-weight:600;"><i class="bi bi-receipt me-1"></i>${txnCount} txn${txnCount !== 1 ? 's' : ''}</span>`;
+    list.appendChild(row);
+
+    // Add chip to edit panel
+    const chipsWrap = group.querySelector('.edit-patterns-wrap');
+    const chip = document.createElement('span');
+    chip.className = 'edit-pattern-chip';
+    chip.dataset.ruleId = ruleId;
+    chip.dataset.action = 'keep';
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.3rem;background:#EFF6FF;color:#2563EB;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.8rem;font-family:monospace;font-weight:600;cursor:default;';
+    chip.innerHTML = `${pattern}<button type="button" onclick="removeChip(this)" style="background:none;border:none;padding:0;color:#93C5FD;cursor:pointer;font-size:0.7rem;line-height:1;" title="Remove"><i class="bi bi-x-lg"></i></button>`;
+    chipsWrap.appendChild(chip);
+}
+
+function buildGroupHTML(category, matchType, priority, rules) {
+    return `
+    <div class="group-view">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="rule-cat-label" style="font-weight:700;font-size:0.85rem;color:#16A34A;background:#F0FDF4;padding:0.2rem 0.6rem;border-radius:6px;">${category}</span>
+                <span style="font-size:0.7rem;color:#94A3B8;">${matchType} · priority ${priority}</span>
+            </div>
+            <button onclick="openGroupEdit(this)" class="btn btn-sm" style="color:#64748B;padding:0.15rem 0.5rem;font-size:0.75rem;border:1px solid #E2E8F0;border-radius:6px;">
+                <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+        </div>
+        <div class="pattern-list d-flex flex-column gap-1"></div>
+    </div>
+    <div class="group-edit" style="display:none;">
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <div>
+                <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Match</label>
+                <select class="form-select form-select-sm edit-match" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:130px;">
+                    <option value="contains" ${matchType === 'contains' ? 'selected' : ''}>contains</option>
+                    <option value="endswith" ${matchType === 'endswith' ? 'selected' : ''}>ends with</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Category</label>
+                <input type="text" class="form-control form-control-sm edit-category" list="categoryList" value="${category}" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:140px;">
+            </div>
+            <div>
+                <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Priority</label>
+                <input type="number" class="form-control form-control-sm edit-priority" value="${priority}" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;width:70px;">
+            </div>
+        </div>
+        <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;margin-bottom:0.4rem;">Patterns</label>
+        <div class="edit-patterns-wrap d-flex flex-wrap gap-1 mb-2" style="min-height:32px;padding:0.4rem;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;"></div>
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" class="form-control form-control-sm new-pattern-input" placeholder="Add pattern..." style="border-radius:6px;border-color:#E2E8F0;font-family:monospace;font-size:0.82rem;">
+            <button type="button" onclick="addChip(this)" class="btn btn-sm" style="background:#EFF6FF;color:#2563EB;border-radius:6px;font-size:0.8rem;padding:0.3rem 0.7rem;white-space:nowrap;flex-shrink:0;"><i class="bi bi-plus-lg"></i></button>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" onclick="saveGroupEdit(this)" class="btn btn-sm" style="background:var(--tcb-navy);color:#fff;border-radius:6px;font-size:0.8rem;padding:0.35rem 0.9rem;font-weight:600;">Save</button>
+            <button type="button" onclick="cancelGroupEdit(this)" class="btn btn-sm" style="border:1px solid #E2E8F0;border-radius:6px;font-size:0.8rem;padding:0.35rem 0.7rem;">Cancel</button>
+        </div>
+    </div>`;
+}
+
+// ── Group edit open/close ──────────────────────────────────────────
+function openGroupEdit(btn) {
+    const group = btn.closest('.rule-group');
+    group.querySelector('.group-view').style.display = 'none';
+    group.querySelector('.group-edit').style.display = 'block';
+    group.querySelector('.new-pattern-input').focus();
+}
+
+function cancelGroupEdit(btn) {
+    const group = btn.closest('.rule-group');
+    // Restore any chips marked for deletion
+    group.querySelectorAll('.edit-pattern-chip[data-action="delete"]').forEach(chip => {
+        chip.dataset.action = 'keep';
+        chip.style.opacity = '1';
+        chip.style.textDecoration = 'none';
+    });
+    // Remove any chips marked as new (not yet saved)
+    group.querySelectorAll('.edit-pattern-chip[data-action="new"]').forEach(chip => chip.remove());
+    group.querySelector('.new-pattern-input').value = '';
+    group.querySelector('.group-edit').style.display = 'none';
+    group.querySelector('.group-view').style.display = 'block';
+}
+
+// ── Chip manipulation ──────────────────────────────────────────────
+function removeChip(btn) {
+    const chip = btn.closest('.edit-pattern-chip');
+    const action = chip.dataset.action;
+    if (action === 'new') {
+        chip.remove();
+        return;
+    }
+    // Mark existing rule for deletion (visual strikethrough)
+    chip.dataset.action = 'delete';
+    chip.style.opacity = '0.4';
+    chip.style.textDecoration = 'line-through';
+    // Change × to undo
+    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+    btn.title = 'Undo remove';
+    btn.onclick = function() { undoChip(this); };
+}
+
+function undoChip(btn) {
+    const chip = btn.closest('.edit-pattern-chip');
+    chip.dataset.action = 'keep';
+    chip.style.opacity = '1';
+    chip.style.textDecoration = 'none';
+    btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+    btn.title = 'Remove';
+    btn.onclick = function() { removeChip(this); };
+}
+
+function addChip(btn) {
+    const group = btn.closest('.rule-group');
+    const input = group.querySelector('.new-pattern-input');
+    const val = input.value.trim();
+    if (!val) return;
+
+    const wrap = group.querySelector('.edit-patterns-wrap');
+    const chip = document.createElement('span');
+    chip.className = 'edit-pattern-chip';
+    chip.dataset.action = 'new';
+    chip.dataset.pattern = val;
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.3rem;background:#D1FAE5;color:#065F46;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.8rem;font-family:monospace;font-weight:600;cursor:default;';
+    chip.innerHTML = `${val}<button type="button" onclick="removeChip(this)" style="background:none;border:none;padding:0;color:#6EE7B7;cursor:pointer;font-size:0.7rem;line-height:1;" title="Remove"><i class="bi bi-x-lg"></i></button>`;
+    wrap.appendChild(chip);
+    input.value = '';
+    input.focus();
+}
+
+// Allow Enter key in new-pattern-input to add chip
+document.getElementById('rulesContainer').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.classList.contains('new-pattern-input')) {
+        e.preventDefault();
+        addChip(e.target.nextElementSibling);
+    }
+});
+
+// ── Save group edit ────────────────────────────────────────────────
+function saveGroupEdit(btn) {
+    const group = btn.closest('.rule-group');
+    const newMatchType = group.querySelector('.edit-match').value;
+    const newCategory = group.querySelector('.edit-category').value.trim();
+    const newPriority = parseInt(group.querySelector('.edit-priority').value) || 0;
+
+    if (!newCategory) { showNotify('Category is required'); return; }
+
+    const chips = group.querySelectorAll('.edit-pattern-chip');
+    const toDelete = [...chips].filter(c => c.dataset.action === 'delete').map(c => parseInt(c.dataset.ruleId));
+    const toAdd = [...chips].filter(c => c.dataset.action === 'new').map(c => c.dataset.pattern);
+    const toUpdate = [...chips].filter(c => c.dataset.action === 'keep').map(c => parseInt(c.dataset.ruleId));
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const tasks = [];
+
+    // Delete removed patterns
+    toDelete.forEach(id => {
+        tasks.push(fetch('/api/rules/' + id, { method: 'DELETE' }).then(r => r.json()));
+    });
+
+    // Update kept patterns (match_type, category, priority may have changed)
+    toUpdate.forEach(id => {
+        tasks.push(fetch('/api/rules/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ match_type: newMatchType, category: newCategory, priority: newPriority })
+        }).then(r => r.json()));
+    });
+
+    // Add new patterns
+    const addPromises = toAdd.map(pattern =>
+        fetch('/api/rules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ match_type: newMatchType, pattern, category: newCategory, priority: newPriority })
+        }).then(r => r.json())
+    );
+
+    Promise.all([...tasks, ...addPromises]).then(results => {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+
+        // Rebuild the group view from current chip state + new ids
+        const addResults = results.slice(tasks.length);
+        rebuildGroupView(group, newCategory, newMatchType, newPriority, toDelete, toAdd, addResults.map(r => r.id || null));
+
+        showNotify('Rules updated');
     });
 }
 
+function rebuildGroupView(group, newCategory, matchType, priority, deletedIds, newPatterns, newIds) {
+    const oldCategory = group.dataset.category;
+
+    // Remove deleted pattern rows from view
+    deletedIds.forEach(id => {
+        const row = group.querySelector(`.pattern-row[data-rule-id="${id}"]`);
+        if (row) row.remove();
+    });
+
+    // Update category on the group element
+    group.dataset.category = newCategory;
+
+    // Update kept rows: refresh category label, meta text
+    group.querySelector('.rule-cat-label').textContent = newCategory;
+    group.querySelector('.group-view .d-flex span:nth-child(2)').textContent = matchType + ' · priority ' + priority;
+
+    // Add new pattern rows to view
+    newPatterns.forEach((pattern, i) => {
+        const id = newIds[i];
+        if (!id) return;
+        const list = group.querySelector('.pattern-list');
+        const row = document.createElement('div');
+        row.className = 'pattern-row d-flex align-items-center gap-2';
+        row.dataset.ruleId = id;
+        row.innerHTML = `<span class="pattern-tag" style="display:inline-flex;align-items:center;background:#EFF6FF;color:#2563EB;border-radius:6px;padding:0.2rem 0.6rem;font-size:0.8rem;font-family:monospace;font-weight:600;">${pattern}</span>
+            <span class="txn-count" style="font-size:0.72rem;color:#94A3B8;font-weight:600;"><i class="bi bi-receipt me-1"></i>0 txns</span>`;
+        list.appendChild(row);
+        // Update chip: mark as keep with real id
+        const chip = [...group.querySelectorAll('.edit-pattern-chip[data-action="new"]')]
+            .find(c => c.dataset.pattern === pattern);
+        if (chip) { chip.dataset.action = 'keep'; chip.dataset.ruleId = id; chip.style.background = '#EFF6FF'; chip.style.color = '#2563EB'; }
+    });
+
+    // Remove the group if no patterns remain
+    if (!group.querySelector('.pattern-row')) {
+        group.remove();
+        if (!document.querySelector('.rule-group')) {
+            document.getElementById('rulesContainer').innerHTML = '<div id="emptyState" class="text-center py-4" style="color:#94A3B8;">No rules defined. Add patterns above to auto-categorize transactions.</div>';
+        }
+    } else {
+        group.querySelector('.group-edit').style.display = 'none';
+        group.querySelector('.group-view').style.display = 'block';
+    }
+
+    updateCount();
+}
+
+// ── Misc ───────────────────────────────────────────────────────────
 function applyRules() {
     const btn = event.target.closest('button');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Applying...';
-
     fetch('/api/rules/apply', { method: 'POST' })
     .then(r => r.json())
     .then(res => {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-lightning-fill me-1"></i> Apply Rules to All Uncategorized';
-        if (res.ok) {
-            showNotify('Updated ' + res.updated + ' transaction' + (res.updated !== 1 ? 's' : ''));
-        }
+        if (res.ok) showNotify('Updated ' + res.updated + ' transaction' + (res.updated !== 1 ? 's' : ''));
     });
-}
-
-// Inline category editing
-function editRuleCat(badge) {
-    const input = badge.nextElementSibling;
-    badge.style.display = 'none';
-    input.style.display = 'inline-block';
-    input.focus();
-    input.select();
-}
-
-function ruleCatKey(e, input) {
-    if (e.key === 'Enter') { e.preventDefault(); saveRuleCat(input); }
-    if (e.key === 'Escape') { cancelRuleCat(input); }
-}
-
-let _ruleCatSaving = false;
-function ruleCatBlur(input) {
-    setTimeout(() => { if (!_ruleCatSaving) saveRuleCat(input); }, 200);
-}
-
-function saveRuleCat(input) {
-    _ruleCatSaving = true;
-    const badge = input.previousElementSibling;
-    const ruleId = input.closest('.rule-cat-cell').dataset.ruleId;
-    const newCat = input.value.trim();
-    if (!newCat || newCat === badge.textContent.trim()) {
-        cancelRuleCat(input);
-        _ruleCatSaving = false;
-        return;
-    }
-    fetch('/api/rules/' + ruleId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: newCat })
-    })
-    .then(r => r.json())
-    .then(res => {
-        _ruleCatSaving = false;
-        if (res.ok) {
-            badge.textContent = res.category;
-            input.value = res.category;
-            showNotify('Category updated');
-        } else {
-            showNotify(res.error || 'Failed to update');
-        }
-        cancelRuleCat(input);
-    });
-}
-
-function cancelRuleCat(input) {
-    const badge = input.previousElementSibling;
-    input.value = badge.textContent.trim();
-    input.style.display = 'none';
-    badge.style.display = '';
 }
 
 function filterRules() {
     const val = document.getElementById('categoryFilter').value.toLowerCase();
-    let visible = 0;
-    document.querySelectorAll('#rulesTable tbody tr[id^="rule-"]').forEach(row => {
-        const cat = row.querySelector('.rule-cat-badge').textContent.trim().toLowerCase();
-        const show = !val || cat === val;
-        row.style.display = show ? '' : 'none';
-        if (show) visible++;
+    document.querySelectorAll('.rule-group').forEach(group => {
+        group.style.display = (!val || group.dataset.category.toLowerCase() === val) ? '' : 'none';
     });
-    document.getElementById('ruleCount').textContent = visible;
+    updateCount();
+}
+
+function updateCount() {
+    document.getElementById('ruleCount').textContent = document.querySelectorAll('.pattern-row').length;
 }
 
 function showNotify(msg) {
