@@ -164,69 +164,6 @@
         </div>
     </div>
 
-    <!-- Fund Charts -->
-    {% if fund_chart.funds %}
-    <div class="row g-3 mt-3">
-        <div class="col-lg-5">
-            <div class="card" style="height: 100%;">
-                <div class="card-header-custom">
-                    <h6><i class="bi bi-wallet2 me-2" style="color: #7C3AED;"></i>Fund Allocation vs Spent</h6>
-                </div>
-                <div style="padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: center; min-height: 280px; gap: 1.5rem; flex-wrap: wrap;">
-                    <div style="position: relative; width: 200px; height: 200px; flex-shrink: 0;">
-                        <canvas id="fundDonutChart"></canvas>
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none;">
-                            <div style="font-size: 0.65rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Spent</div>
-                            <div id="fundDonutTotal" style="font-size: 1rem; font-weight: 800; color: var(--tcb-navy); line-height: 1.2;"></div>
-                        </div>
-                    </div>
-                    <div id="fundDonutLegend" style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 130px;"></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-7">
-            <div class="card" style="height: 100%;">
-                <div class="card-header-custom">
-                    <h6><i class="bi bi-bar-chart-steps me-2" style="color: #7C3AED;"></i>Fund Spending by Month</h6>
-                </div>
-                <div style="padding: 1rem 1.25rem; min-height: 280px;">
-                    <canvas id="fundBarChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Savings Summary -->
-    {% if savings %}
-    {% set ns = namespace(total_principal=0, total_interest=0, total_value=0) %}
-    {% for s in savings %}
-        {% set ns.total_principal = ns.total_principal + s.current_principal %}
-        {% set ns.total_interest = ns.total_interest + s.interest %}
-        {% set ns.total_value = ns.total_value + s.current_principal + s.interest %}
-    {% endfor %}
-    <div class="card mt-3">
-        <div class="card-header-custom">
-            <h6><i class="bi bi-piggy-bank-fill me-2" style="color: #16A34A;"></i>Savings Overview</h6>
-        </div>
-        <div style="padding: 1rem 1.25rem; display: flex; gap: 1.5rem; align-items: center; justify-content: center; flex-wrap: wrap;">
-            <!-- By fund donut -->
-            <div style="position: relative; width: 160px; height: 160px; flex-shrink: 0;">
-                <canvas id="savingsFundDonutChart"></canvas>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none;">
-                    <div style="font-size: 0.6rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Principal</div>
-                    <div id="savingsFundDonutTotal" style="font-size: 0.88rem; font-weight: 800; color: var(--tcb-navy); line-height: 1.2;"></div>
-                </div>
-            </div>
-            <!-- Legend -->
-            <div style="min-width: 200px;">
-                <div style="font-size: 0.65rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">By Fund · Principal</div>
-                <div id="savingsFundLegend" style="display: flex; flex-direction: column; gap: 0.3rem;"></div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Category Spending Breakdown -->
     {% if category_summary.categories %}
     <div class="card mt-3">
@@ -237,6 +174,63 @@
             <canvas id="categoryChart"></canvas>
         </div>
     </div>
+    {% endif %}
+
+    <!-- Fund Charts -->
+    {% if fund_chart.funds or savings %}
+    <div class="row g-3 mt-3">
+        {% if fund_chart.funds %}
+        <div class="col-lg-6">
+            <div class="card" style="height:100%;">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-wallet2 me-2" style="color: #7C3AED;"></i>Funds Overview</h6>
+                </div>
+                <div style="padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+                    <div style="position: relative; width: 180px; height: 180px; flex-shrink: 0;">
+                        <canvas id="fundDonutChart"></canvas>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none;">
+                            <div style="font-size: 0.65rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Balance</div>
+                            <div id="fundDonutTotal" style="font-size: 1rem; font-weight: 800; color: var(--tcb-navy); line-height: 1.2;"></div>
+                        </div>
+                    </div>
+                    <div id="fundDonutLegend" style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px;"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if savings %}
+        {% set ns = namespace(total_principal=0, total_interest=0, total_value=0) %}
+        {% for s in savings %}
+            {% set ns.total_principal = ns.total_principal + s.current_principal %}
+            {% set ns.total_interest = ns.total_interest + s.interest %}
+            {% set ns.total_value = ns.total_value + s.current_principal + s.interest %}
+        {% endfor %}
+        <div class="col-lg-6">
+            <div class="card" style="height:100%;">
+                <div class="card-header-custom">
+                    <h6><i class="bi bi-piggy-bank-fill me-2" style="color: #16A34A;"></i>Savings Overview</h6>
+                </div>
+                <div style="padding: 1rem 1.25rem; display: flex; gap: 1.5rem; align-items: center; justify-content: center; flex-wrap: wrap;">
+                    <div style="position: relative; width: 160px; height: 160px; flex-shrink: 0;">
+                        <canvas id="savingsFundDonutChart"></canvas>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none;">
+                            <div style="font-size: 0.6rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Principal</div>
+                            <div id="savingsFundDonutTotal" style="font-size: 0.88rem; font-weight: 800; color: var(--tcb-navy); line-height: 1.2;"></div>
+                        </div>
+                    </div>
+                    <div style="min-width: 160px;">
+                        <div style="font-size: 0.65rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">By Fund · Principal</div>
+                        <div id="savingsFundLegend" style="display: flex; flex-direction: column; gap: 0.3rem;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if category_summary.categories %}
     <div class="card mt-3">
         <div class="card-header-custom" data-collapse="catTotals" style="cursor: pointer; user-select: none;">
             <h6><i class="bi bi-list-check me-2" style="color: #D97706;"></i>Category Totals</h6>
@@ -595,25 +589,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Fund charts
     const fundChart = {{ fund_chart | tojson }};
+    const fundBalances = {{ fund_balances | tojson }};
     const FUND_COLORS = ['#7C3AED','#2563EB','#059669','#D97706','#E4002B','#EC4899','#0891B2','#84CC16','#F97316','#6366F1'];
 
     const fundDonutCanvas = document.getElementById('fundDonutChart');
     if (fundDonutCanvas && fundChart.funds.length > 0) {
-        const hasSomeSpent = fundChart.funds.some(f => f.spent > 0);
-        const totalSpent = fundChart.funds.reduce((s, f) => s + f.spent, 0);
+        const balances = fundChart.funds.map(f => Math.max(0, fundBalances[f.name] || 0));
+        const totalBalance = balances.reduce((s, b) => s + b, 0);
         document.getElementById('fundDonutTotal').textContent =
-            totalSpent >= 1e6 ? (totalSpent/1e6).toFixed(1)+'M' : (totalSpent/1e3).toFixed(0)+'K';
-
-        const donutData = hasSomeSpent
-            ? fundChart.funds.map(f => f.spent)
-            : fundChart.funds.map(f => f.allocated);
+            totalBalance >= 1e9 ? (totalBalance/1e9).toFixed(1)+'B' :
+            totalBalance >= 1e6 ? (totalBalance/1e6).toFixed(1)+'M' : (totalBalance/1e3).toFixed(0)+'K';
 
         new Chart(fundDonutCanvas, {
             type: 'doughnut',
             data: {
                 labels: fundChart.funds.map(f => f.name),
                 datasets: [{
-                    data: donutData,
+                    data: balances,
                     backgroundColor: FUND_COLORS.slice(0, fundChart.funds.length),
                     borderWidth: 2,
                     borderColor: '#fff',
@@ -638,50 +630,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Custom legend
         const legend = document.getElementById('fundDonutLegend');
         fundChart.funds.forEach((f, i) => {
-            const pct = totalSpent > 0 ? Math.round(f.spent / totalSpent * 100) : 0;
+            const bal = Math.max(0, fundBalances[f.name] || 0);
+            const pct = totalBalance > 0 ? Math.round(bal / totalBalance * 100) : 0;
             legend.innerHTML += `<div style="display:flex;align-items:center;gap:0.5rem;">
                 <span style="width:10px;height:10px;border-radius:50%;background:${FUND_COLORS[i]};flex-shrink:0;"></span>
                 <span style="font-size:0.75rem;font-weight:600;color:var(--tcb-navy);flex:1;">${f.name}</span>
-                <span style="font-size:0.72rem;color:#94A3B8;font-weight:700;">${pct}%</span>
+                <span style="font-size:0.72rem;color:#64748B;">${pct}%</span>
+                <span style="font-size:0.72rem;font-weight:700;color:#7C3AED;">${bal.toLocaleString('en-US',{maximumFractionDigits:0})}</span>
             </div>`;
         });
     }
 
-    const fundBarCanvas = document.getElementById('fundBarChart');
-    if (fundBarCanvas && fundChart.monthly.length > 0) {
-        const fundNames = fundChart.funds.map(f => f.name);
-        const monthLabels = fundChart.monthly.map(m => {
-            const [y, mo] = m.month.split('-');
-            return new Date(y, mo - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
-        });
-
-        const barDatasets = fundNames.map((name, i) => ({
-            label: name,
-            data: fundChart.monthly.map(m => m[name] || 0),
-            backgroundColor: FUND_COLORS[i % FUND_COLORS.length],
-            borderRadius: 4, borderSkipped: false,
-        }));
-
-        new Chart(fundBarCanvas, {
-            type: 'bar',
-            data: { labels: monthLabels, datasets: barDatasets },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11, weight: '500' }}},
-                    tooltip: {
-                        backgroundColor: '#0F172A', padding: 12, cornerRadius: 8,
-                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' VND' }
-                    }
-                },
-                scales: {
-                    x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: '#94A3B8', font: { size: 11 }}},
-                    y: { stacked: true, beginAtZero: true, grid: { color: '#F1F5F9' }, border: { display: false },
-                         ticks: { color: '#94A3B8', font: { size: 11 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K' }}
-                }
-            }
-        });
-    }
 });
 </script>
 {% endif %}

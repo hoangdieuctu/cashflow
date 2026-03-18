@@ -89,6 +89,7 @@ def index():
         categories = repo.get_all_categories(statement_id=statement_id, statement_type=statement_type, start_date=start_date, end_date=end_date)
         category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category, statement_type=statement_type, start_date=start_date, end_date=end_date)
         fund_chart = repo.get_fund_chart_data(start_date=start_date, end_date=end_date)
+        fund_balances = {f["name"]: f["balance"] for f in repo.get_fund_balances()}
         all_savings = repo.get_savings()
         dashboard_savings = [
             {
@@ -120,6 +121,7 @@ def index():
         categories=categories,
         category_summary=category_summary,
         fund_chart=fund_chart,
+        fund_balances=fund_balances,
         savings=dashboard_savings,
         period_options=period_options,
         filters={
