@@ -61,6 +61,64 @@ CREATE TABLE IF NOT EXISTS category_rules (
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(match_type, pattern)
 );
+
+CREATE TABLE IF NOT EXISTS funds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    percentage REAL NOT NULL DEFAULT 0,
+    description TEXT,
+    override_balance REAL DEFAULT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS fund_categories (
+    fund_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    PRIMARY KEY (fund_id, category),
+    FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS salary_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL UNIQUE,
+    amount REAL NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS fund_balance_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fund_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('topup', 'manual')),
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS savings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    principal REAL NOT NULL,
+    annual_rate REAL NOT NULL,
+    term_months INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    rollover_type TEXT NOT NULL DEFAULT 'withdraw' CHECK(rollover_type IN ('withdraw', 'rollover_principal', 'rollover_full')),
+    saving_type TEXT NOT NULL DEFAULT 'fixed' CHECK(saving_type IN ('fixed', 'flexible')),
+    fund_id INTEGER REFERENCES funds(id) ON DELETE SET NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS saving_withdrawals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    saving_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (saving_id) REFERENCES savings(id) ON DELETE CASCADE
+);
 """
 
 
@@ -93,6 +151,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     existing_txn_cols = {
         row[1] for row in conn.execute("PRAGMA table_info(transactions)").fetchall()
     }
+    existing_fund_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(funds)").fetchall()
+        if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='funds'").fetchone()
+    }
 
     migrations = []
 
@@ -108,6 +170,62 @@ def _migrate(conn: sqlite3.Connection) -> None:
         migrations.append("ALTER TABLE statements ADD COLUMN ending_balance TEXT")
     if "running_balance" not in existing_txn_cols:
         migrations.append("ALTER TABLE transactions ADD COLUMN running_balance TEXT")
+    if existing_fund_cols and "override_balance" not in existing_fund_cols:
+        migrations.append("ALTER TABLE funds ADD COLUMN override_balance REAL DEFAULT NULL")
+
+    # Create fund_balance_log if it doesn't exist (new table, use CREATE IF NOT EXISTS)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fund_balance_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fund_id INTEGER NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('topup', 'manual')),
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (fund_id) REFERENCES funds(id) ON DELETE CASCADE
+        )
+    """)
+
+    # Create savings table if it doesn't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS savings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            principal REAL NOT NULL,
+            annual_rate REAL NOT NULL,
+            term_months INTEGER NOT NULL,
+            start_date TEXT NOT NULL,
+            rollover_type TEXT NOT NULL DEFAULT 'withdraw' CHECK(rollover_type IN ('withdraw', 'rollover_principal', 'rollover_full')),
+            saving_type TEXT NOT NULL DEFAULT 'fixed' CHECK(saving_type IN ('fixed', 'flexible')),
+            fund_id INTEGER REFERENCES funds(id) ON DELETE SET NULL,
+            note TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    # Add saving_withdrawals table if it doesn't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS saving_withdrawals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            saving_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (saving_id) REFERENCES savings(id) ON DELETE CASCADE
+        )
+    """)
+    # Add new columns to existing savings table if missing
+    existing_saving_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(savings)").fetchall()
+        if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='savings'").fetchone()
+    }
+    if existing_saving_cols and "rollover_type" not in existing_saving_cols:
+        conn.execute("ALTER TABLE savings ADD COLUMN rollover_type TEXT NOT NULL DEFAULT 'withdraw'")
+    if existing_saving_cols and "fund_id" not in existing_saving_cols:
+        conn.execute("ALTER TABLE savings ADD COLUMN fund_id INTEGER REFERENCES funds(id) ON DELETE SET NULL")
+    if existing_saving_cols and "saving_type" not in existing_saving_cols:
+        conn.execute("ALTER TABLE savings ADD COLUMN saving_type TEXT NOT NULL DEFAULT 'fixed'")
 
     for sql in migrations:
         conn.execute(sql)

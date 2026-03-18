@@ -88,6 +88,22 @@ def index():
         total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search, statement_type=statement_type, start_date=start_date, end_date=end_date)
         categories = repo.get_all_categories(statement_id=statement_id, statement_type=statement_type, start_date=start_date, end_date=end_date)
         category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category, statement_type=statement_type, start_date=start_date, end_date=end_date)
+        fund_chart = repo.get_fund_chart_data(start_date=start_date, end_date=end_date)
+        all_savings = repo.get_savings()
+        dashboard_savings = [
+            {
+                "name": s["name"],
+                "current_principal": s["current_principal"],
+                "interest": s["interest"],
+                "maturity_date": s["maturity_date"],
+                "days_remaining": s["days_remaining"],
+                "annual_rate": s["annual_rate"],
+                "term_months": s["term_months"],
+                "saving_type": s["saving_type"],
+                "fund_name": s["fund_name"],
+            }
+            for s in all_savings
+        ]
 
     total_pages = max(1, (total + per_page - 1) // per_page)
 
@@ -103,6 +119,8 @@ def index():
         total_pages=total_pages,
         categories=categories,
         category_summary=category_summary,
+        fund_chart=fund_chart,
+        savings=dashboard_savings,
         period_options=period_options,
         filters={
             "start_date": start_date or "",
@@ -313,3 +331,270 @@ def update_category(txn_id: int):
                 )
 
     return jsonify({"ok": True, "category": category, "updated_count": updated_count})
+
+
+# ── Funds ──────────────────────────────────────────────────────────────────────
+
+@bp.route("/funds")
+def funds():
+    """Funds management page."""
+    year_month = request.args.get("year_month") or None
+    with _get_repo() as repo:
+        balances = repo.get_fund_balances(year_month=year_month)
+        salary_entries = repo.get_salary_entries()
+        all_categories = repo.get_all_categories()
+        period_options = repo.get_available_years_months()
+        assigned = {cat for f in balances for cat in f["categories"]}
+    return render_template(
+        "funds.html",
+        funds=balances,
+        salary_entries=salary_entries,
+        all_categories=all_categories,
+        assigned_categories=assigned,
+        period_options=period_options,
+        year_month=year_month,
+    )
+
+
+@bp.route("/api/funds/<int:fund_id>/history")
+def fund_history(fund_id: int):
+    year_month = request.args.get("year_month") or None
+    with _get_repo() as repo:
+        events = repo.get_fund_history(fund_id, year_month=year_month)
+    return jsonify(events)
+
+
+@bp.route("/api/funds", methods=["POST"])
+def add_fund():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    percentage = data.get("percentage", 0)
+    description = (data.get("description") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    try:
+        percentage = float(percentage)
+    except (TypeError, ValueError):
+        return jsonify({"error": "percentage must be a number"}), 400
+    with _get_repo() as repo:
+        fund_id = repo.add_fund(name, percentage, description)
+    return jsonify({"ok": True, "id": fund_id})
+
+
+@bp.route("/api/funds/<int:fund_id>", methods=["PUT"])
+def update_fund(fund_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip() or None
+    percentage = data.get("percentage")
+    description = data.get("description")
+    # override_balance: not in payload = don't touch; null = clear; number = set
+    override_balance = False  # sentinel: not provided
+    override_reason = None
+    if "override_balance" in data:
+        v = data["override_balance"]
+        override_balance = float(v) if v is not None else None
+        override_reason = (data.get("override_reason") or "").strip() or None
+    if percentage is not None:
+        try:
+            percentage = float(percentage)
+        except (TypeError, ValueError):
+            return jsonify({"error": "percentage must be a number"}), 400
+    if description is not None:
+        description = description.strip()
+    with _get_repo() as repo:
+        ok = repo.update_fund(fund_id, name=name, percentage=percentage, description=description, override_balance=override_balance, override_reason=override_reason)
+    if not ok:
+        return jsonify({"error": "Fund not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/funds/<int:fund_id>", methods=["DELETE"])
+def delete_fund(fund_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_fund(fund_id)
+    if not ok:
+        return jsonify({"error": "Fund not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/funds/<int:fund_id>/categories", methods=["PUT"])
+def set_fund_categories(fund_id: int):
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body required"}), 400
+    categories = data.get("categories", [])
+    if not isinstance(categories, list):
+        return jsonify({"error": "categories must be a list"}), 400
+    with _get_repo() as repo:
+        repo.set_fund_categories(fund_id, categories)
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/salary", methods=["POST"])
+def add_salary():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    year_month = (data.get("year_month") or "").strip()
+    amount = data.get("amount")
+    if not year_month or len(year_month) != 7:
+        return jsonify({"error": "year_month must be YYYY-MM"}), 400
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a number"}), 400
+    with _get_repo() as repo:
+        entry_id = repo.add_salary_entry(year_month, amount)
+    return jsonify({"ok": True, "id": entry_id})
+
+
+@bp.route("/api/salary/<int:entry_id>", methods=["DELETE"])
+def delete_salary(entry_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_salary_entry(entry_id)
+    if not ok:
+        return jsonify({"error": "Entry not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/salary/from-transactions")
+def salary_from_transactions():
+    """Return credit transactions with category='Salary' grouped by month."""
+    with _get_repo() as repo:
+        rows = repo.conn.execute(
+            """SELECT substr(transaction_date, 1, 7) as year_month,
+                      SUM(CAST(billing_amount_vnd AS REAL)) as amount,
+                      COUNT(*) as count
+               FROM transactions
+               WHERE category = 'Salary' AND transaction_type = 'credit'
+               GROUP BY year_month
+               ORDER BY year_month DESC"""
+        ).fetchall()
+        existing = {e["year_month"] for e in repo.get_salary_entries()}
+    return jsonify([
+        {"year_month": r["year_month"], "amount": r["amount"], "count": r["count"],
+         "already_imported": r["year_month"] in existing}
+        for r in rows
+    ])
+
+
+# ── Savings ────────────────────────────────────────────────────────────────────
+
+@bp.route("/savings")
+def savings():
+    """Savings management page."""
+    with _get_repo() as repo:
+        all_savings = repo.get_savings()
+        all_funds = repo.get_funds()
+    return render_template("savings.html", savings=all_savings, funds=all_funds)
+
+
+@bp.route("/api/savings", methods=["POST"])
+def add_saving():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    principal = data.get("principal")
+    annual_rate = data.get("annual_rate")
+    term_months = data.get("term_months")
+    start_date = (data.get("start_date") or "").strip()
+    rollover_type = (data.get("rollover_type") or "withdraw").strip()
+    note = (data.get("note") or "").strip()
+    fund_id_raw = data.get("fund_id")
+    fund_id = int(fund_id_raw) if fund_id_raw else None
+    saving_type = (data.get("saving_type") or "fixed").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    if not start_date:
+        return jsonify({"error": "start_date is required"}), 400
+    if rollover_type not in ("withdraw", "rollover_principal", "rollover_full"):
+        return jsonify({"error": "invalid rollover_type"}), 400
+    if saving_type not in ("fixed", "flexible"):
+        return jsonify({"error": "invalid saving_type"}), 400
+    try:
+        principal = float(principal)
+        annual_rate = float(annual_rate)
+        term_months = int(term_months)
+    except (TypeError, ValueError):
+        return jsonify({"error": "principal, annual_rate, term_months must be numbers"}), 400
+    with _get_repo() as repo:
+        saving_id = repo.add_saving(name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type)
+    return jsonify({"ok": True, "id": saving_id})
+
+
+@bp.route("/api/savings/<int:saving_id>", methods=["PUT"])
+def update_saving(saving_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    principal = data.get("principal")
+    annual_rate = data.get("annual_rate")
+    term_months = data.get("term_months")
+    start_date = (data.get("start_date") or "").strip()
+    rollover_type = (data.get("rollover_type") or "withdraw").strip()
+    note = (data.get("note") or "").strip()
+    fund_id_raw = data.get("fund_id")
+    fund_id = int(fund_id_raw) if fund_id_raw else None
+    saving_type = (data.get("saving_type") or "fixed").strip()
+    if not name or not start_date:
+        return jsonify({"error": "name and start_date are required"}), 400
+    if rollover_type not in ("withdraw", "rollover_principal", "rollover_full"):
+        return jsonify({"error": "invalid rollover_type"}), 400
+    if saving_type not in ("fixed", "flexible"):
+        return jsonify({"error": "invalid saving_type"}), 400
+    try:
+        principal = float(principal)
+        annual_rate = float(annual_rate)
+        term_months = int(term_months)
+    except (TypeError, ValueError):
+        return jsonify({"error": "principal, annual_rate, term_months must be numbers"}), 400
+    with _get_repo() as repo:
+        ok = repo.update_saving(saving_id, name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type)
+    if not ok:
+        return jsonify({"error": "Saving not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/savings/<int:saving_id>", methods=["DELETE"])
+def delete_saving(saving_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_saving(saving_id)
+    if not ok:
+        return jsonify({"error": "Saving not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/savings/<int:saving_id>/withdrawals", methods=["POST"])
+def add_saving_withdrawal(saving_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    w_date = (data.get("date") or "").strip()
+    amount = data.get("amount")
+    note = (data.get("note") or "").strip()
+    if not w_date:
+        return jsonify({"error": "date is required"}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        wid = repo.add_saving_withdrawal(saving_id, w_date, amount, note)
+    return jsonify({"ok": True, "id": wid})
+
+
+@bp.route("/api/savings/<int:saving_id>/withdrawals/<int:withdrawal_id>", methods=["DELETE"])
+def delete_saving_withdrawal(saving_id: int, withdrawal_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_saving_withdrawal(withdrawal_id)
+    if not ok:
+        return jsonify({"error": "Withdrawal not found"}), 404
+    return jsonify({"ok": True})

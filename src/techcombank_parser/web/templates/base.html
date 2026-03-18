@@ -229,9 +229,18 @@
             <a href="{{ url_for('main.rules') }}" class="{% if request.endpoint == 'main.rules' %}active{% endif %}">
                 <i class="bi bi-tag-fill"></i> Rules
             </a>
+            <a href="{{ url_for('main.funds') }}" class="{% if request.endpoint == 'main.funds' %}active{% endif %}">
+                <i class="bi bi-wallet2"></i> Funds
+            </a>
+            <a href="{{ url_for('main.savings') }}" class="{% if request.endpoint == 'main.savings' %}active{% endif %}">
+                <i class="bi bi-piggy-bank"></i> Savings
+                {% if savings_maturing_this_month > 0 %}
+                <span style="margin-left:auto;background:#E4002B;color:#fff;font-size:0.62rem;font-weight:700;border-radius:10px;padding:0.05rem 0.45rem;line-height:1.6;">{{ savings_maturing_this_month }}</span>
+                {% endif %}
+            </a>
         </nav>
         <div class="sidebar-footer">
-            v1.0.3
+            v1.0.4
         </div>
     </aside>
 
