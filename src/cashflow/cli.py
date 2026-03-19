@@ -8,11 +8,11 @@ from pathlib import Path
 
 import click
 
-from techcombank_parser.config import OUTPUT_DIR, SAMPLES_DIR
+from cashflow.config import OUTPUT_DIR, SAMPLES_DIR
 
 
 @click.group()
-@click.version_option(package_name="techcombank-parser")
+@click.version_option(package_name="cashflow")
 def cli():
     """Techcombank Credit Card PDF Statement Parser."""
 
@@ -26,7 +26,7 @@ def cli():
 @click.option("--password", "-p", type=str, default=None, help="PDF password")
 def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str, pages: str | None, password: str | None):
     """Convert PDF pages to images."""
-    from techcombank_parser.converter.pdf_to_image import convert_pdf_to_images
+    from cashflow.converter.pdf_to_image import convert_pdf_to_images
 
     page_list = None
     if pages:
@@ -52,10 +52,10 @@ def convert(pdf_path: Path, output_dir: Path | None, dpi: int, image_format: str
 @click.option("--password", "-p", type=str, default=None, help="PDF password")
 def parse(pdf_path: Path, output_format: str, output_dir: Path | None, password: str | None):
     """Parse a PDF statement and export results."""
-    from techcombank_parser.exporter.csv_exporter import export_csv
-    from techcombank_parser.exporter.excel_exporter import export_excel
-    from techcombank_parser.exporter.json_exporter import export_json
-    from techcombank_parser.parser.statement_parser import parse_statement
+    from cashflow.exporter.csv_exporter import export_csv
+    from cashflow.exporter.excel_exporter import export_excel
+    from cashflow.exporter.json_exporter import export_json
+    from cashflow.parser.statement_parser import parse_statement
 
     output_dir = output_dir or OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -89,8 +89,8 @@ def parse(pdf_path: Path, output_format: str, output_dir: Path | None, password:
 @click.option("--password", "-p", type=str, default=None, help="PDF password")
 def import_cmd(pdf_path: Path, db: Path | None, password: str | None):
     """Parse a PDF and import into the SQLite database."""
-    from techcombank_parser.database.repository import Repository
-    from techcombank_parser.parser.statement_parser import parse_statement
+    from cashflow.database.repository import Repository
+    from cashflow.parser.statement_parser import parse_statement
 
     result = parse_statement(pdf_path, password=password)
     click.echo(f"Parsed {result.transaction_count} transactions ({result.parse_method})")
@@ -110,7 +110,7 @@ def import_cmd(pdf_path: Path, db: Path | None, password: str | None):
 @click.option("--summary", is_flag=True, help="Show spending summary instead")
 def query(start_date, end_date, txn_type, search, limit, db, summary):
     """Query transactions from the database."""
-    from techcombank_parser.database.repository import Repository
+    from cashflow.database.repository import Repository
 
     with Repository(str(db) if db else None) as repo:
         if summary:
@@ -153,7 +153,7 @@ def query(start_date, end_date, txn_type, search, limit, db, summary):
 @click.option("--db", type=click.Path(path_type=Path), default=None)
 def serve(host: str, port: int, debug: bool, db: str | None):
     """Start the web dashboard."""
-    from techcombank_parser.web.app import create_app
+    from cashflow.web.app import create_app
 
     app = create_app(db_path=str(db) if db else None)
     click.echo(f"Starting dashboard at http://{host}:{port}")

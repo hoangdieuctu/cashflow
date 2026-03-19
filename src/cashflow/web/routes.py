@@ -20,7 +20,7 @@ bp = Blueprint("main", __name__)
 
 
 def _get_repo():
-    from techcombank_parser.database.repository import Repository
+    from cashflow.database.repository import Repository
     return Repository(current_app.config["DB_PATH"])
 
 
@@ -88,7 +88,7 @@ def index():
         total = repo.get_transaction_count(statement_id=statement_id, category=category, search=search, statement_type=statement_type, start_date=start_date, end_date=end_date)
         categories = repo.get_all_categories(statement_id=statement_id, statement_type=statement_type, start_date=start_date, end_date=end_date)
         category_summary = repo.get_category_monthly_summary(statement_id=statement_id, category=category, statement_type=statement_type, start_date=start_date, end_date=end_date)
-        fund_chart = repo.get_fund_chart_data(start_date=start_date, end_date=end_date)
+        fund_chart = repo.get_fund_chart_data()
         fund_balances = {f["name"]: f["balance"] for f in repo.get_fund_balances()}
         all_savings = repo.get_savings()
         dashboard_savings = [
@@ -158,7 +158,7 @@ def upload():
             tmp_path = Path(tmp.name)
 
         try:
-            from techcombank_parser.parser.statement_parser import parse_statement
+            from cashflow.parser.statement_parser import parse_statement
 
             result = parse_statement(tmp_path, password=password)
             result.metadata.source_file = file.filename

@@ -20,15 +20,15 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from techcombank_parser.models.transaction import (
+from cashflow.models.transaction import (
     ParseResult,
     StatementMetadata,
     StatementType,
     Transaction,
     TransactionType,
 )
-from techcombank_parser.parser.normalizer import parse_date, parse_vnd_amount
-from techcombank_parser.parser.text_parser import _open_pdf
+from cashflow.parser.normalizer import parse_date, parse_vnd_amount
+from cashflow.parser.text_parser import _open_pdf
 
 logger = logging.getLogger(__name__)
 

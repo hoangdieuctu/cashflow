@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "techcombank-parser"
+name = "cashflow"
 version = "1.0.5"
-description = "Parse Techcombank credit card PDF statements"
+description = "Cashflow – credit card PDF statement parser"
 requires-python = ">=3.10"
 dependencies = [
     "PyMuPDF>=1.24",
@@ -24,13 +24,13 @@ dev = [
 ]
 
 [project.scripts]
-techcombank-parser = "techcombank_parser.cli:cli"
+cashflow = "cashflow.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-techcombank_parser = ["web/templates/*", "web/static/**/*"]
+cashflow = ["web/templates/*", "web/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

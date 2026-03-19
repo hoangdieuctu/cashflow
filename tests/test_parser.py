@@ -3,7 +3,7 @@
 from datetime import date
 from decimal import Decimal
 
-from techcombank_parser.models.transaction import (
+from cashflow.models.transaction import (
     ParseResult,
     StatementMetadata,
     Transaction,

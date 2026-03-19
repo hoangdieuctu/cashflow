@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-# Project root is two levels up from this file (src/techcombank_parser/config.py)
+# Project root is two levels up from this file (src/cashflow/config.py)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Data directories
@@ -11,7 +11,7 @@ SAMPLES_DIR = DATA_DIR / "samples"
 OUTPUT_DIR = DATA_DIR / "output"
 
 # Database
-DATABASE_PATH = PROJECT_ROOT / "techcombank.db"
+DATABASE_PATH = PROJECT_ROOT / "cashflow.db"
 
 # PDF to image conversion
 DEFAULT_DPI = 300

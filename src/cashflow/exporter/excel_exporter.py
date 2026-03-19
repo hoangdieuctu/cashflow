@@ -8,7 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, numbers
 from openpyxl.utils import get_column_letter
 
-from techcombank_parser.models.transaction import ParseResult, TransactionType
+from cashflow.models.transaction import ParseResult, TransactionType
 
 
 def export_excel(result: ParseResult, output_path: str | Path) -> Path:

@@ -15,12 +15,12 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir .
 
 # Copy the seed database
-COPY techcombank.db /app/techcombank.db.seed
+COPY cashflow.db /app/cashflow.db.seed
 
 # Create a non-root user and data directory
 RUN useradd -m appuser && \
     mkdir -p /data && \
-    chown appuser:appuser /data /app/techcombank.db.seed
+    chown appuser:appuser /data /app/cashflow.db.seed
 
 USER appuser
 
@@ -29,4 +29,4 @@ VOLUME /data
 EXPOSE 5000
 
 # On first run, copy seed DB to /data if not already present, then serve
-ENTRYPOINT ["sh", "-c", "[ ! -f /data/techcombank.db ] && cp /app/techcombank.db.seed /data/techcombank.db; exec techcombank-parser serve --host 0.0.0.0 --db /data/techcombank.db"]
+ENTRYPOINT ["sh", "-c", "[ ! -f /data/cashflow.db ] && cp /app/cashflow.db.seed /data/cashflow.db; exec cashflow serve --host 0.0.0.0 --db /data/cashflow.db"]

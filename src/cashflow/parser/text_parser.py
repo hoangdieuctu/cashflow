@@ -13,13 +13,13 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from techcombank_parser.models.transaction import (
+from cashflow.models.transaction import (
     ParseResult,
     StatementMetadata,
     Transaction,
     TransactionType,
 )
-from techcombank_parser.parser.normalizer import (
+from cashflow.parser.normalizer import (
     normalize_vietnamese_text,
     parse_date,
     parse_vnd_amount,

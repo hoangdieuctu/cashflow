@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Flask
 
-from techcombank_parser.config import DATABASE_PATH
+from cashflow.config import DATABASE_PATH
 
 
 def create_app(db_path: str | None = None) -> Flask:
@@ -19,9 +19,9 @@ def create_app(db_path: str | None = None) -> Flask:
 
     app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
     app.config["DB_PATH"] = db_path or str(DATABASE_PATH)
-    app.secret_key = "techcombank-parser-dev-key"
+    app.secret_key = "cashflow-dev-key"
 
-    from techcombank_parser.web.routes import bp
+    from cashflow.web.routes import bp
     app.register_blueprint(bp)
 
     @app.context_processor
@@ -29,7 +29,7 @@ def create_app(db_path: str | None = None) -> Flask:
         """Inject count of savings maturing in the current month into all templates."""
         import calendar
         from datetime import date
-        from techcombank_parser.database.db import get_connection
+        from cashflow.database.db import get_connection
         try:
             today = date.today()
             current_ym = today.strftime("%Y-%m")

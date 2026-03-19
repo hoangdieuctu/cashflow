@@ -7,8 +7,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from techcombank_parser.database.db import init_db
-from techcombank_parser.models.transaction import (
+from cashflow.database.db import init_db
+from cashflow.models.transaction import (
     ParseResult,
     StatementMetadata,
     StatementType,

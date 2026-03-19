@@ -7,8 +7,8 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from techcombank_parser.models.transaction import ParseResult
-from techcombank_parser.parser.text_parser import _open_pdf
+from cashflow.models.transaction import ParseResult
+from cashflow.parser.text_parser import _open_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +57,8 @@ def parse_statement(
     logger.info("Detected statement type '%s' for %s", stmt_type, pdf_path.name)
 
     if stmt_type == "bank_account":
-        from techcombank_parser.parser.bank_statement_parser import parse_bank_statement_pdf
+        from cashflow.parser.bank_statement_parser import parse_bank_statement_pdf
         return parse_bank_statement_pdf(pdf_path, password=password)
 
-    from techcombank_parser.parser.text_parser import parse_text_pdf
+    from cashflow.parser.text_parser import parse_text_pdf
     return parse_text_pdf(pdf_path, password=password)

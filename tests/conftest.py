@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from techcombank_parser.models.transaction import (
+from cashflow.models.transaction import (
     ParseResult,
     StatementMetadata,
     Transaction,
