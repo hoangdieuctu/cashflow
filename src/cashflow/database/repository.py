@@ -614,6 +614,14 @@ class Repository:
                    VALUES (?, 'topup', ?, ?, ?)""",
                 (fund["id"], year_month + "-01", topup, f"Salary {year_month}"),
             )
+            # If fund has a manual override balance, add the topup to it so salary
+            # continues accumulating from the last reconciled snapshot
+            if fund.get("override_balance") is not None:
+                new_balance = fund["override_balance"] + topup
+                self.conn.execute(
+                    "UPDATE funds SET override_balance = ? WHERE id = ?",
+                    (new_balance, fund["id"]),
+                )
         self.conn.commit()
         return entry_id
 
