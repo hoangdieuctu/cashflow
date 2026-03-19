@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cashflow · Locked</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(160deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .lock-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 2rem; padding: 2rem 1rem;
+            width: 100%; max-width: 320px;
+        }
+
+        /* Brand */
+        .brand {
+            display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+        }
+        .brand-icon {
+            width: 56px; height: 56px; border-radius: 16px;
+            background: linear-gradient(135deg, #E4002B, #FF4D6D);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; color: #fff;
+            box-shadow: 0 8px 24px rgba(228,0,43,0.4);
+        }
+        .brand h1 { color: #fff; font-size: 1.4rem; font-weight: 800; }
+        .brand p { color: #94A3B8; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.5px; }
+
+        /* Dots */
+        .dots {
+            display: flex; gap: 1rem; align-items: center; height: 20px;
+        }
+        .dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.4);
+            background: transparent;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .dot.filled {
+            background: #fff;
+            border-color: #fff;
+            transform: scale(1.1);
+        }
+        .dot.error {
+            border-color: #E4002B;
+            background: #E4002B;
+        }
+
+        /* Error msg */
+        .error-msg {
+            color: #F87171;
+            font-size: 0.8rem;
+            font-weight: 600;
+            height: 1.2em;
+            text-align: center;
+        }
+
+        /* Keypad */
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.85rem;
+            width: 100%;
+        }
+        .key {
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 1.4rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: background 0.12s, transform 0.08s;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            line-height: 1;
+        }
+        .key:hover { background: rgba(255,255,255,0.18); }
+        .key:active { background: rgba(255,255,255,0.28); transform: scale(0.93); }
+        .key .sub {
+            font-size: 0.45rem;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+        .key.empty { background: transparent; cursor: default; pointer-events: none; }
+        .key.del { background: transparent; font-size: 1.2rem; }
+        .key.del:hover { background: rgba(255,255,255,0.08); }
+        .key.del:active { background: rgba(255,255,255,0.15); transform: scale(0.93); }
+
+        /* Shake animation on error */
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+        .dots.shake { animation: shake 0.4s ease; }
+    </style>
+</head>
+<body>
+<div class="lock-wrap">
+    <div class="brand">
+        <div class="brand-icon">&#x1F4B5;</div>
+        <h1>Cashflow</h1>
+        <p>Enter passcode to continue</p>
+    </div>
+
+    <div class="dots" id="dots">
+        <div class="dot {% if error %}error{% endif %}" id="d0"></div>
+        <div class="dot {% if error %}error{% endif %}" id="d1"></div>
+        <div class="dot {% if error %}error{% endif %}" id="d2"></div>
+        <div class="dot {% if error %}error{% endif %}" id="d3"></div>
+        <div class="dot {% if error %}error{% endif %}" id="d4"></div>
+        <div class="dot {% if error %}error{% endif %}" id="d5"></div>
+    </div>
+
+    <div class="error-msg" id="errMsg">{% if error %}Incorrect passcode{% endif %}</div>
+
+    <div class="keypad" id="keypad">
+        <button class="key" data-n="1">1<span class="sub">&nbsp;</span></button>
+        <button class="key" data-n="2">2<span class="sub">ABC</span></button>
+        <button class="key" data-n="3">3<span class="sub">DEF</span></button>
+        <button class="key" data-n="4">4<span class="sub">GHI</span></button>
+        <button class="key" data-n="5">5<span class="sub">JKL</span></button>
+        <button class="key" data-n="6">6<span class="sub">MNO</span></button>
+        <button class="key" data-n="7">7<span class="sub">PQRS</span></button>
+        <button class="key" data-n="8">8<span class="sub">TUV</span></button>
+        <button class="key" data-n="9">9<span class="sub">WXYZ</span></button>
+        <button class="key empty" aria-hidden="true"></button>
+        <button class="key" data-n="0">0<span class="sub">&nbsp;</span></button>
+        <button class="key del" id="delBtn" aria-label="Delete">⌫</button>
+    </div>
+
+    <form id="lockForm" method="POST" action="{{ url_for('main.lock', next=request.args.get('next', '')) }}" style="display:none;">
+        <input type="hidden" name="passcode" id="passcodeInput">
+    </form>
+</div>
+
+<script>
+    const MAX_LEN = 6;
+    let code = '';
+    const dots = document.querySelectorAll('.dot');
+    const dotsWrap = document.getElementById('dots');
+    const errMsg = document.getElementById('errMsg');
+
+    {% if error %}
+    setTimeout(() => {
+        dotsWrap.classList.add('shake');
+        setTimeout(() => {
+            dots.forEach(d => { d.classList.remove('error', 'filled'); });
+            dotsWrap.classList.remove('shake');
+            errMsg.textContent = '';
+        }, 600);
+    }, 10);
+    {% endif %}
+
+    function updateDots() {
+        dots.forEach((d, i) => {
+            d.classList.toggle('filled', i < code.length);
+            d.classList.remove('error');
+        });
+    }
+
+    function submit() {
+        document.getElementById('passcodeInput').value = code;
+        document.getElementById('lockForm').submit();
+    }
+
+    document.querySelectorAll('.key[data-n]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (code.length >= MAX_LEN) return;
+            code += btn.dataset.n;
+            updateDots();
+            if (code.length === MAX_LEN) {
+                setTimeout(submit, 120);
+            }
+        });
+    });
+
+    document.getElementById('delBtn').addEventListener('click', () => {
+        code = code.slice(0, -1);
+        updateDots();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key >= '0' && e.key <= '9' && code.length < MAX_LEN) {
+            code += e.key;
+            updateDots();
+            if (code.length === MAX_LEN) setTimeout(submit, 120);
+        } else if (e.key === 'Backspace') {
+            code = code.slice(0, -1);
+            updateDots();
+        }
+    });
+</script>
+</body>
+</html>

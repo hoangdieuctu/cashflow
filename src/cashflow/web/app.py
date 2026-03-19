@@ -24,12 +24,42 @@ def create_app(db_path: str | None = None) -> Flask:
     from cashflow.web.routes import bp
     app.register_blueprint(bp)
 
+    from datetime import datetime, timezone
+
+    @app.before_request
+    def require_passcode():
+        from flask import request, session, redirect, url_for
+        from cashflow.database.repository import Repository
+        if request.endpoint in ("main.lock", "main.lock_now", "static"):
+            return
+        with Repository(app.config["DB_PATH"]) as repo:
+            enabled = repo.get_setting("passcode_enabled") == "1"
+        if not enabled:
+            return
+        auth_at = session.get("authenticated_at")
+        if auth_at and (datetime.now(timezone.utc).timestamp() - auth_at) < 300:
+            session["authenticated_at"] = datetime.now(timezone.utc).timestamp()
+            return
+        session.pop("authenticated_at", None)
+        return redirect(url_for("main.lock", next=request.path))
+
     @app.context_processor
-    def inject_savings_badge():
-        """Inject count of savings maturing in the current month into all templates."""
+    def inject_globals():
+        """Inject global template variables."""
         import calendar
         from datetime import date
         from cashflow.database.db import get_connection
+        result = {}
+
+        # Passcode enabled flag
+        try:
+            from cashflow.database.repository import Repository
+            with Repository(app.config["DB_PATH"]) as repo:
+                result["passcode_enabled"] = repo.get_setting("passcode_enabled") == "1"
+        except Exception:
+            result["passcode_enabled"] = False
+
+        # Savings maturing this month
         try:
             today = date.today()
             current_ym = today.strftime("%Y-%m")
@@ -50,8 +80,10 @@ def create_app(db_path: str | None = None) -> Flask:
                         count += 1
                 except (ValueError, TypeError):
                     pass
+            result["savings_maturing_this_month"] = count
         except Exception:
-            count = 0
-        return {"savings_maturing_this_month": count}
+            result["savings_maturing_this_month"] = 0
+
+        return result
 
     return app

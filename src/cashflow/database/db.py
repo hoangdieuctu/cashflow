@@ -119,6 +119,11 @@ CREATE TABLE IF NOT EXISTS saving_withdrawals (
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (saving_id) REFERENCES savings(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 
@@ -226,6 +231,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE savings ADD COLUMN fund_id INTEGER REFERENCES funds(id) ON DELETE SET NULL")
     if existing_saving_cols and "saving_type" not in existing_saving_cols:
         conn.execute("ALTER TABLE savings ADD COLUMN saving_type TEXT NOT NULL DEFAULT 'fixed'")
+
+    # Create settings table if it doesn't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
 
     for sql in migrations:
         conn.execute(sql)

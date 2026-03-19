@@ -13,6 +13,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
@@ -22,6 +23,79 @@ bp = Blueprint("main", __name__)
 def _get_repo():
     from cashflow.database.repository import Repository
     return Repository(current_app.config["DB_PATH"])
+
+
+@bp.route("/lock/now")
+def lock_now():
+    session.pop("authenticated_at", None)
+    return redirect(url_for("main.lock"))
+
+
+@bp.route("/lock", methods=["GET", "POST"])
+def lock():
+    from datetime import datetime, timezone
+    if request.method == "POST":
+        import hashlib
+        entered = request.form.get("passcode", "")
+        with _get_repo() as repo:
+            stored_hash = repo.get_setting("passcode_hash")
+        entered_hash = hashlib.sha256(entered.encode()).hexdigest()
+        if stored_hash and entered_hash == stored_hash:
+            session["authenticated_at"] = datetime.now(timezone.utc).timestamp()
+            next_url = request.args.get("next") or url_for("main.index")
+            return redirect(next_url)
+        return render_template("lock.html", error=True)
+    return render_template("lock.html", error=False)
+
+
+@bp.route("/settings")
+def settings():
+    with _get_repo() as repo:
+        enabled = repo.get_setting("passcode_enabled") == "1"
+        has_passcode = repo.get_setting("passcode_hash") is not None
+    return render_template("settings.html", passcode_enabled=enabled, has_passcode=has_passcode)
+
+
+@bp.route("/api/settings/passcode", methods=["POST"])
+def api_settings_passcode():
+    import hashlib
+    data = request.get_json()
+    action = data.get("action")  # "enable", "disable", "change"
+
+    with _get_repo() as repo:
+        stored_hash = repo.get_setting("passcode_hash")
+        enabled = repo.get_setting("passcode_enabled") == "1"
+
+        if action == "enable":
+            new_code = data.get("passcode", "")
+            if not new_code.isdigit() or len(new_code) != 6:
+                return jsonify({"error": "Passcode must be 6 digits"}), 400
+            repo.set_setting("passcode_hash", hashlib.sha256(new_code.encode()).hexdigest())
+            repo.set_setting("passcode_enabled", "1")
+            session.pop("authenticated_at", None)
+
+        elif action == "disable":
+            current = data.get("current_passcode", "")
+            if stored_hash and hashlib.sha256(current.encode()).hexdigest() != stored_hash:
+                return jsonify({"error": "Incorrect passcode"}), 403
+            repo.set_setting("passcode_enabled", "0")
+            from datetime import datetime, timezone
+            session["authenticated_at"] = datetime.now(timezone.utc).timestamp()
+
+        elif action == "change":
+            current = data.get("current_passcode", "")
+            new_code = data.get("passcode", "")
+            if stored_hash and hashlib.sha256(current.encode()).hexdigest() != stored_hash:
+                return jsonify({"error": "Incorrect current passcode"}), 403
+            if not new_code.isdigit() or len(new_code) != 6:
+                return jsonify({"error": "New passcode must be 6 digits"}), 400
+            repo.set_setting("passcode_hash", hashlib.sha256(new_code.encode()).hexdigest())
+            session.pop("authenticated_at", None)
+
+        else:
+            return jsonify({"error": "Invalid action"}), 400
+
+    return jsonify({"ok": True})
 
 
 @bp.route("/")
@@ -456,11 +530,7 @@ def add_salary():
 
 @bp.route("/api/salary/<int:entry_id>", methods=["DELETE"])
 def delete_salary(entry_id: int):
-    with _get_repo() as repo:
-        ok = repo.delete_salary_entry(entry_id)
-    if not ok:
-        return jsonify({"error": "Entry not found"}), 404
-    return jsonify({"ok": True})
+    return jsonify({"error": "Salary entries cannot be deleted"}), 403
 
 
 @bp.route("/api/salary/from-transactions")

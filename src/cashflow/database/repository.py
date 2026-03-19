@@ -615,12 +615,17 @@ class Repository:
                 (fund["id"], year_month + "-01", topup, f"Salary {year_month}"),
             )
             # If fund has a manual override balance, add the topup to it so salary
-            # continues accumulating from the last reconciled snapshot
+            # continues accumulating from the last reconciled snapshot.
+            # Also clear manual log entries so the "manual" label is removed.
             if fund.get("override_balance") is not None:
                 new_balance = fund["override_balance"] + topup
                 self.conn.execute(
                     "UPDATE funds SET override_balance = ? WHERE id = ?",
                     (new_balance, fund["id"]),
+                )
+                self.conn.execute(
+                    "DELETE FROM fund_balance_log WHERE fund_id = ? AND type = 'manual'",
+                    (fund["id"],),
                 )
         self.conn.commit()
         return entry_id
@@ -734,6 +739,11 @@ class Repository:
                         cats,
                     ).fetchone()["cnt"]
 
+            has_manual = self.conn.execute(
+                "SELECT COUNT(*) as cnt FROM fund_balance_log WHERE fund_id = ? AND type = 'manual'",
+                (fund["id"],),
+            ).fetchone()["cnt"] > 0
+
             results.append({
                 "id": fund["id"],
                 "name": fund["name"],
@@ -744,7 +754,7 @@ class Repository:
                 "allocated": allocated,
                 "spent": spent,
                 "balance": fund["override_balance"] if fund.get("override_balance") is not None else allocated - spent_alltime + savings_principal,
-                "is_override": fund.get("override_balance") is not None,
+                "is_override": has_manual,
                 "history_count": log_count + txn_count + savings_count,
                 "monthly": dict(sorted(monthly.items())),
             })
@@ -1106,6 +1116,21 @@ class Repository:
 
         self.conn.commit()
         return total_updated
+
+    # ── Settings ──
+
+    def get_setting(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str | None) -> None:
+        if value is None:
+            self.conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+        else:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value)
+            )
+        self.conn.commit()
 
 
 def _date_str(d: date | None) -> str | None:
