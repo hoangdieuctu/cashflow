@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pip3 install:*)",
+      "Bash(uv run:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(git mv:*)",
+      "Bash(pip3 uninstall:*)",
+      "Bash(cashflow:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(docker:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(sqlite3:*)",
+      "Bash(kill:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(ls *.db)",
+      "Bash(xargs sed:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(ssh-add ~/.ssh/id_ed25519_personal)"
+    ]
+  }
+}

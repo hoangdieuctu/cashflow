@@ -1,7 +1,7 @@
 services:
   app:
-    container_name: cashflow
-    image: hoangdieuctu/cashflow:1.0.5
+    container_name: cashflow-pub
+    image: hoangdieuctu/cashflow-pub:1.0.7
     ports:
       - "5000:5000"
     volumes:
