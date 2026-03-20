@@ -1,8 +1,0 @@
-services:
-  app:
-    container_name: cashflow-pub
-    image: hoangdieuctu/cashflow-pub:1.0.7
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./data:/data
