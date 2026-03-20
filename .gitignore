@@ -19,3 +19,5 @@ data/output/
 htmlcov/
 *.log
 .DS_Store
+settings.local.json
+.idea/*
