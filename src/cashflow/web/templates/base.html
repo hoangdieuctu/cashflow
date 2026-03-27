@@ -247,6 +247,18 @@
             <a href="{{ url_for('main.investments') }}" class="{% if request.endpoint == 'main.investments' %}active{% endif %}">
                 <i class="bi bi-graph-up-arrow"></i> Investments
             </a>
+            <a href="{{ url_for('main.pays') }}" class="{% if request.endpoint == 'main.pays' %}active{% endif %}">
+                <i class="bi bi-calendar-check"></i> Pays
+                {% if pays_warning_count > 0 %}
+                <span style="margin-left:auto;background:#D97706;color:#fff;font-size:0.62rem;font-weight:700;border-radius:10px;padding:0.05rem 0.45rem;line-height:1.6;">{{ pays_warning_count }}</span>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('main.assets') }}" class="{% if request.endpoint == 'main.assets' %}active{% endif %}">
+                <i class="bi bi-bank"></i> Assets
+            </a>
+            <a href="{{ url_for('main.portfolios') }}" class="{% if request.endpoint == 'main.portfolios' %}active{% endif %}">
+                <i class="bi bi-pie-chart-fill"></i> Portfolios
+            </a>
             <a href="{{ url_for('main.settings') }}" class="{% if request.endpoint == 'main.settings' %}active{% endif %}">
                 <i class="bi bi-gear-fill"></i> Settings
             </a>
@@ -257,7 +269,7 @@
                 <i class="bi bi-lock-fill" style="font-size:0.9rem;"></i> Lock Now
             </a>
             {% endif %}
-            v1.0.10
+            v1.0.11
         </div>
     </aside>
 

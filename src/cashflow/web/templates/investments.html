@@ -61,6 +61,13 @@
                     <span style="color: #64748B;">Total ({{ unit }})</span>
                     <span style="font-weight: 700; color: #059669;">{{ "{:,.0f}".format(total) }} {{ unit }}</span>
                 </div>
+                {% set unit_upper = unit.upper() %}
+                {% if unit_upper != 'VND' and unit_upper in converters %}
+                <div style="display: flex; justify-content: space-between; font-size: 0.78rem; padding-top: 0.1rem;">
+                    <span style="color: #94A3B8;">≈ in VND</span>
+                    <span style="font-weight: 600; color: #64748B;">{{ "{:,.0f}".format(total * converters[unit_upper]) }} VND</span>
+                </div>
+                {% endif %}
                 {% endfor %}
             </div>
         </div>
@@ -95,6 +102,10 @@
                     </div>
                     <div style="text-align: right; flex-shrink: 0;">
                         <div style="font-size: 1.1rem; font-weight: 800; color: #059669;">{{ "{:,.0f}".format(inv.total_invested) }} <span style="font-size: 0.75rem; color: #94A3B8;">{{ inv.unit }}</span></div>
+                        {% set unit_upper = inv.unit.upper() %}
+                        {% if unit_upper != 'VND' and unit_upper in converters %}
+                        <div style="font-size: 0.75rem; color: #64748B; margin-top: 0.1rem;">≈ {{ "{:,.0f}".format(inv.total_invested * converters[unit_upper]) }} VND</div>
+                        {% endif %}
                         <div style="font-size: 0.7rem; color: #94A3B8;">{{ inv.item_count }} item{{ 's' if inv.item_count != 1 else '' }}</div>
                     </div>
                     <button onclick="openInvEdit({{ inv.id }})" style="background: #F1F5F9; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #475569; cursor: pointer;" title="Edit"><i class="bi bi-pencil-fill" style="font-size: 0.8rem;"></i></button>

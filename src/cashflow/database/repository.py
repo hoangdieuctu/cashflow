@@ -1330,6 +1330,103 @@ class Repository:
         self.conn.commit()
         return cur.rowcount > 0
 
+    # ── Pays ──
+
+    def get_pays(self) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM pays ORDER BY name"
+        ).fetchall()
+        result = []
+        for row in rows:
+            pay = dict(row)
+            items = self.conn.execute(
+                "SELECT * FROM pay_items WHERE pay_id = ? ORDER BY date DESC, created_at DESC",
+                (pay["id"],),
+            ).fetchall()
+            pay["entries"] = [dict(i) for i in items]
+            pay["unpaid_count"] = sum(1 for i in pay["entries"] if not i["paid"])
+            pay["total_amount"] = sum(i["amount"] for i in pay["entries"])
+            pay["paid_amount"] = sum(i["amount"] for i in pay["entries"] if i["paid"])
+            result.append(pay)
+        return result
+
+    def add_pay(self, name: str, description: str | None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO pays (name, description) VALUES (?, ?)",
+            (name, description or None),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_pay(self, pay_id: int, name: str, description: str | None) -> bool:
+        cur = self.conn.execute(
+            "UPDATE pays SET name = ?, description = ? WHERE id = ?",
+            (name, description or None, pay_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_pay(self, pay_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM pays WHERE id = ?", (pay_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def add_pay_item(self, pay_id: int, date: str, amount: float, note: str | None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO pay_items (pay_id, date, amount, note, paid) VALUES (?, ?, ?, ?, 0)",
+            (pay_id, date, amount, note or None),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_pay_item(self, item_id: int, date: str, amount: float, note: str | None) -> bool:
+        cur = self.conn.execute(
+            "UPDATE pay_items SET date = ?, amount = ?, note = ? WHERE id = ?",
+            (date, amount, note or None, item_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def mark_pay_item_paid(self, item_id: int, paid: bool) -> bool:
+        cur = self.conn.execute(
+            "UPDATE pay_items SET paid = ? WHERE id = ?",
+            (1 if paid else 0, item_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_pay_item(self, item_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM pay_items WHERE id = ?", (item_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # ── Assets ──
+
+    def get_assets(self) -> list[dict]:
+        rows = self.conn.execute("SELECT * FROM assets ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+
+    def add_asset(self, name: str, description: str | None, amount: float, unit: str) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO assets (name, description, amount, unit) VALUES (?, ?, ?, ?)",
+            (name, description or None, amount, unit),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_asset(self, asset_id: int, name: str, description: str | None, amount: float, unit: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE assets SET name = ?, description = ?, amount = ?, unit = ? WHERE id = ?",
+            (name, description or None, amount, unit, asset_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_asset(self, asset_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
 
 def _date_str(d: date | None) -> str | None:
     return d.isoformat() if d else None

@@ -98,6 +98,49 @@ def api_settings_passcode():
     return jsonify({"ok": True})
 
 
+@bp.route("/api/settings/converters", methods=["GET"])
+def get_converters():
+    import json
+    with _get_repo() as repo:
+        raw = repo.get_setting("unit_converters")
+    converters = json.loads(raw) if raw else {}
+    return jsonify(converters)
+
+
+@bp.route("/api/settings/converters", methods=["POST"])
+def add_converter():
+    import json
+    data = request.get_json()
+    unit = (data.get("unit") or "").strip().upper()
+    rate = data.get("rate")
+    if not unit:
+        return jsonify({"error": "unit is required"}), 400
+    try:
+        rate = float(rate)
+        if rate <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "rate must be a positive number"}), 400
+    with _get_repo() as repo:
+        raw = repo.get_setting("unit_converters")
+        converters = json.loads(raw) if raw else {}
+        converters[unit] = rate
+        repo.set_setting("unit_converters", json.dumps(converters))
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/settings/converters/<unit>", methods=["DELETE"])
+def delete_converter(unit: str):
+    import json
+    unit = unit.upper()
+    with _get_repo() as repo:
+        raw = repo.get_setting("unit_converters")
+        converters = json.loads(raw) if raw else {}
+        converters.pop(unit, None)
+        repo.set_setting("unit_converters", json.dumps(converters))
+    return jsonify({"ok": True})
+
+
 @bp.route("/")
 def index():
     """Single-page dashboard with stats, charts, and transactions."""
@@ -824,11 +867,14 @@ def delete_fee_entry(fee_id: int, entry_id: int):
 
 @bp.route("/investments")
 def investments():
+    import json
     with _get_repo() as repo:
         invs = repo.get_investments()
         for inv in invs:
             inv["entries"] = repo.get_investment_items(inv["id"])
-    return render_template("investments.html", investments=invs)
+        raw = repo.get_setting("unit_converters")
+    converters = json.loads(raw) if raw else {}
+    return render_template("investments.html", investments=invs, converters=converters)
 
 
 @bp.route("/api/investments", methods=["POST"])
@@ -929,3 +975,194 @@ def delete_investment_item(investment_id: int, item_id: int):
     if not ok:
         return jsonify({"error": "Item not found"}), 404
     return jsonify({"ok": True})
+
+
+# ── Pays ──
+
+@bp.route("/pays")
+def pays():
+    with _get_repo() as repo:
+        pays_list = repo.get_pays()
+    return render_template("pays.html", pays=pays_list)
+
+
+@bp.route("/api/pays", methods=["POST"])
+def add_pay():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    description = (data.get("description") or "").strip()
+    with _get_repo() as repo:
+        try:
+            pid = repo.add_pay(name, description)
+        except Exception:
+            return jsonify({"error": "Pay name already exists"}), 409
+    return jsonify({"ok": True, "id": pid})
+
+
+@bp.route("/api/pays/<int:pay_id>", methods=["PUT"])
+def update_pay(pay_id: int):
+    data = request.get_json()
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    description = (data.get("description") or "").strip()
+    with _get_repo() as repo:
+        ok = repo.update_pay(pay_id, name, description)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/pays/<int:pay_id>", methods=["DELETE"])
+def delete_pay(pay_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_pay(pay_id)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/pays/<int:pay_id>/items", methods=["POST"])
+def add_pay_item(pay_id: int):
+    data = request.get_json()
+    date_val = (data.get("date") or "").strip()
+    amount = data.get("amount")
+    if not date_val:
+        return jsonify({"error": "date is required"}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a positive number"}), 400
+    note = (data.get("note") or "").strip()
+    with _get_repo() as repo:
+        iid = repo.add_pay_item(pay_id, date_val, amount, note)
+    return jsonify({"ok": True, "id": iid})
+
+
+@bp.route("/api/pays/<int:pay_id>/items/<int:item_id>", methods=["PUT"])
+def update_pay_item(pay_id: int, item_id: int):
+    data = request.get_json()
+    date_val = (data.get("date") or "").strip()
+    amount = data.get("amount")
+    if not date_val:
+        return jsonify({"error": "date is required"}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a positive number"}), 400
+    note = (data.get("note") or "").strip()
+    with _get_repo() as repo:
+        ok = repo.update_pay_item(item_id, date_val, amount, note)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/pays/<int:pay_id>/items/<int:item_id>/paid", methods=["POST"])
+def toggle_pay_item_paid(pay_id: int, item_id: int):
+    data = request.get_json()
+    paid = bool(data.get("paid", True))
+    with _get_repo() as repo:
+        ok = repo.mark_pay_item_paid(item_id, paid)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/pays/<int:pay_id>/items/<int:item_id>", methods=["DELETE"])
+def delete_pay_item(pay_id: int, item_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_pay_item(item_id)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ── Assets ──
+
+@bp.route("/assets")
+def assets():
+    import json
+    with _get_repo() as repo:
+        assets_list = repo.get_assets()
+        raw = repo.get_setting("unit_converters")
+    converters = json.loads(raw) if raw else {}
+    return render_template("assets.html", assets=assets_list, converters=converters)
+
+
+@bp.route("/api/assets", methods=["POST"])
+def add_asset():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    try:
+        amount = float(data.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a number"}), 400
+    description = (data.get("description") or "").strip()
+    unit = (data.get("unit") or "VND").strip()
+    with _get_repo() as repo:
+        try:
+            aid = repo.add_asset(name, description, amount, unit)
+        except Exception:
+            return jsonify({"error": "Asset name already exists"}), 409
+    return jsonify({"ok": True, "id": aid})
+
+
+@bp.route("/api/assets/<int:asset_id>", methods=["PUT"])
+def update_asset(asset_id: int):
+    data = request.get_json()
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    try:
+        amount = float(data.get("amount", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a number"}), 400
+    description = (data.get("description") or "").strip()
+    unit = (data.get("unit") or "VND").strip()
+    with _get_repo() as repo:
+        ok = repo.update_asset(asset_id, name, description, amount, unit)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/assets/<int:asset_id>", methods=["DELETE"])
+def delete_asset(asset_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_asset(asset_id)
+    if not ok:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ── Portfolios ──
+
+@bp.route("/portfolios")
+def portfolios():
+    import json
+    with _get_repo() as repo:
+        assets_list = repo.get_assets()
+        investments_list = repo.get_investments()
+        savings_list = repo.get_savings()
+        raw = repo.get_setting("unit_converters")
+    converters = json.loads(raw) if raw else {}
+    return render_template(
+        "portfolios.html",
+        assets=assets_list,
+        investments=investments_list,
+        savings=savings_list,
+        converters=converters,
+    )

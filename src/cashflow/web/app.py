@@ -104,6 +104,26 @@ def create_app(db_path: str | None = None) -> Flask:
         except Exception:
             result["extra_fees_warning_count"] = 0
 
+        # Pays with unpaid items due within 7 days (including overdue)
+        try:
+            today = date.today()
+            conn = get_connection(app.config["DB_PATH"])
+            rows = conn.execute(
+                "SELECT date FROM pay_items WHERE paid = 0 AND date IS NOT NULL AND date != ''"
+            ).fetchall()
+            conn.close()
+            pays_warn = 0
+            for r in rows:
+                try:
+                    dl = date.fromisoformat(r["date"])
+                    if (dl - today).days <= 7:
+                        pays_warn += 1
+                except (ValueError, TypeError):
+                    pass
+            result["pays_warning_count"] = pays_warn
+        except Exception:
+            result["pays_warning_count"] = 0
+
         result["now_date"] = date.today().isoformat()
         return result
 

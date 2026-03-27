@@ -2,7 +2,43 @@
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
+<div class="row justify-content-center g-4">
+    <div class="col-lg-5 col-md-7">
+
+        <!-- Unit Converters -->
+        <div class="card mb-4">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-arrow-left-right me-2" style="color:#059669;"></i>Unit → VND Converters</h6>
+            </div>
+            <div style="padding:1.25rem;">
+                <p style="font-size:0.82rem;color:#64748B;margin-bottom:1rem;">Define how many VND one unit is worth. Used to show VND equivalents in Investments.</p>
+                <table class="table table-sm mb-3" id="convertersTable" style="font-size:0.82rem;">
+                    <thead>
+                        <tr>
+                            <th style="font-size:0.7rem;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;padding:0.5rem 0.75rem;border-bottom:2px solid #F1F5F9;">Unit</th>
+                            <th style="font-size:0.7rem;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;padding:0.5rem 0.75rem;border-bottom:2px solid #F1F5F9;text-align:right;">Rate (VND per 1 unit)</th>
+                            <th style="border-bottom:2px solid #F1F5F9;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="converterRows">
+                        <tr id="noConvertersRow"><td colspan="3" style="text-align:center;color:#94A3B8;padding:1rem;font-size:0.82rem;">No converters defined yet</td></tr>
+                    </tbody>
+                </table>
+                <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+                    <div>
+                        <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">Unit</label>
+                        <input type="text" id="newConvUnit" placeholder="e.g. USD, BAR, BTC" class="form-control form-control-sm" style="width:120px;border-radius:8px;border-color:#E2E8F0;text-transform:uppercase;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">VND per 1 unit</label>
+                        <input type="number" id="newConvRate" placeholder="e.g. 25000" min="0" step="any" class="form-control form-control-sm" style="width:160px;border-radius:8px;border-color:#E2E8F0;">
+                    </div>
+                    <button onclick="addConverter()" class="btn btn-sm" style="background:#059669;color:#fff;border-radius:8px;font-weight:700;padding:0.45rem 1rem;white-space:nowrap;"><i class="bi bi-plus-circle me-1"></i>Add</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
     <div class="col-lg-5 col-md-7">
         <div class="card">
             <div class="card-header-custom">
@@ -226,5 +262,102 @@ document.addEventListener('keydown', e => {
     if (document.getElementById('keypadOverlay').style.display === 'none') return;
     if (e.key === 'Escape') closePanel();
 });
+
+// ── Unit Converters ──
+const fmt = n => new Intl.NumberFormat('vi-VN').format(n);
+
+async function loadConverters() {
+    const resp = await fetch('/api/settings/converters');
+    const data = await resp.json();
+    const tbody = document.getElementById('converterRows');
+    const noRow = document.getElementById('noConvertersRow');
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+        noRow.style.display = '';
+        return;
+    }
+    noRow.style.display = 'none';
+    tbody.querySelectorAll('.conv-row').forEach(r => r.remove());
+    for (const [unit, rate] of entries) {
+        const tr = document.createElement('tr');
+        tr.className = 'conv-row';
+        tr.dataset.unit = unit;
+        tr.innerHTML = `
+            <td style="padding:0.5rem 0.75rem;font-weight:700;color:var(--tcb-navy);" class="conv-unit-cell">${unit}</td>
+            <td style="padding:0.5rem 0.75rem;text-align:right;font-weight:600;color:#059669;" class="conv-rate-cell">${fmt(rate)} VND</td>
+            <td style="padding:0.5rem 0.75rem;text-align:right;white-space:nowrap;">
+                <button onclick="openConvEdit(this, '${unit}', ${rate})" style="background:none;border:none;color:#64748B;cursor:pointer;padding:0.1rem 0.3rem;" title="Edit"><i class="bi bi-pencil-fill" style="font-size:0.8rem;"></i></button>
+                <button onclick="deleteConverter('${unit}')" style="background:none;border:none;color:#DC2626;cursor:pointer;padding:0.1rem 0.3rem;" title="Delete"><i class="bi bi-trash-fill" style="font-size:0.8rem;"></i></button>
+            </td>`;
+        tbody.insertBefore(tr, noRow);
+    }
+}
+
+async function addConverter() {
+    const unit = document.getElementById('newConvUnit').value.trim().toUpperCase();
+    const rate = parseFloat(document.getElementById('newConvRate').value);
+    if (!unit) { alert('Unit is required'); return; }
+    if (!rate || rate <= 0) { alert('Rate must be a positive number'); return; }
+    const resp = await fetch('/api/settings/converters', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ unit, rate }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); return; }
+    document.getElementById('newConvUnit').value = '';
+    document.getElementById('newConvRate').value = '';
+    loadConverters();
+}
+
+async function deleteConverter(unit) {
+    if (!confirm(`Delete converter for ${unit}?`)) return;
+    const resp = await fetch('/api/settings/converters/' + encodeURIComponent(unit), { method: 'DELETE' });
+    if (!resp.ok) { alert('Error'); return; }
+    loadConverters();
+}
+
+function openConvEdit(btn, unit, rate) {
+    const tr = btn.closest('tr');
+    tr.querySelector('.conv-rate-cell').innerHTML =
+        `<input type="number" value="${rate}" step="any" min="0" class="form-control form-control-sm"
+                style="width:150px;border-radius:6px;font-size:0.8rem;display:inline-block;"
+                id="editRate_${unit}">`;
+    btn.innerHTML = '<i class="bi bi-check-lg" style="font-size:0.85rem;"></i>';
+    btn.style.color = '#059669';
+    btn.setAttribute('onclick', `saveConvEdit(this, '${unit}')`);
+    btn.title = 'Save';
+    // add cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.innerHTML = '<i class="bi bi-x-lg" style="font-size:0.8rem;"></i>';
+    cancelBtn.style.cssText = 'background:none;border:none;color:#94A3B8;cursor:pointer;padding:0.1rem 0.3rem;';
+    cancelBtn.title = 'Cancel';
+    cancelBtn.id = `cancelConv_${unit}`;
+    cancelBtn.setAttribute('onclick', `cancelConvEdit('${unit}', ${rate})`);
+    btn.insertAdjacentElement('afterend', cancelBtn);
+    document.getElementById(`editRate_${unit}`).focus();
+}
+
+async function saveConvEdit(btn, unit) {
+    const rate = parseFloat(document.getElementById('editRate_' + unit).value);
+    if (!rate || rate <= 0) { alert('Rate must be a positive number'); return; }
+    btn.disabled = true;
+    const resp = await fetch('/api/settings/converters', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ unit, rate }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    loadConverters();
+}
+
+function cancelConvEdit(unit, rate) {
+    loadConverters();
+}
+
+document.getElementById('newConvUnit').addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+});
+
+loadConverters();
 </script>
 {% endblock %}

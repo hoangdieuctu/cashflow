@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block page_title %}Assets{% endblock %}
+
+{% block content %}
+<style>
+.asset-row-edit { display: none; background: #F8FAFC; }
+</style>
+
+{# Compute total VND #}
+{% set ns = namespace(total_vnd=0, has_unconverted=false) %}
+{% for a in assets %}
+    {% set u = a.unit.upper() %}
+    {% if u == 'VND' %}
+        {% set ns.total_vnd = ns.total_vnd + a.amount %}
+    {% elif u in converters %}
+        {% set ns.total_vnd = ns.total_vnd + a.amount * converters[u] %}
+    {% else %}
+        {% set ns.has_unconverted = true %}
+    {% endif %}
+{% endfor %}
+
+<div class="row g-4">
+
+    <!-- Left: Add form + Summary -->
+    <div class="col-lg-4">
+        <div class="card" style="padding: 1.25rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 1rem;">
+                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>New Asset
+            </h6>
+            <form id="addAssetForm">
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+                    <input type="text" class="form-control form-control-sm" id="assetName" placeholder="e.g. House, Car, Gold" style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Amount</label>
+                    <input type="number" class="form-control form-control-sm" id="assetAmount" placeholder="0" step="any" min="0" style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Unit / Currency</label>
+                    <input type="text" class="form-control form-control-sm" id="assetUnit" placeholder="VND, USD, bar…" value="VND" style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Description (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="assetDesc" placeholder="Short description" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.55rem;">
+                    <i class="bi bi-plus-circle me-1"></i>Add Asset
+                </button>
+            </form>
+        </div>
+
+        {% if assets %}
+        <div class="card" style="padding: 1.25rem; margin-top: 1rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 0.75rem; font-size: 0.85rem;">Summary</h6>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748B;">Total assets</span>
+                    <span style="font-weight: 600; color: var(--tcb-navy);">{{ assets | length }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; padding-top: 0.25rem; border-top: 1px solid #F1F5F9;">
+                    <span style="color: #64748B;">Total value (VND)</span>
+                    <div style="text-align: right;">
+                        <span style="font-weight: 700; color: #059669;">{{ "{:,.0f}".format(ns.total_vnd) }} VND</span>
+                        {% if ns.has_unconverted %}
+                        <div style="font-size: 0.7rem; color: #D97706; margin-top: 0.1rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Some assets have no converter</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Assets table -->
+    <div class="col-lg-8">
+        {% if not assets %}
+        <div style="text-align: center; padding: 4rem 2rem; color: #94A3B8;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.4;"><i class="bi bi-bank"></i></div>
+            <h5 style="color: #64748B; font-weight: 700;">No assets yet</h5>
+            <p style="font-size: 0.85rem;">Add your first asset to start tracking your net worth.</p>
+        </div>
+        {% else %}
+        <div class="card" style="padding: 0;">
+            <div style="overflow: hidden; border-radius: 14px;">
+                <table class="table table-sm mb-0" style="font-size: 0.83rem;">
+                    <thead>
+                        <tr style="background: #F8FAFC;">
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E2E8F0;">Name</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E2E8F0; text-align: right;">Amount</th>
+                            <th style="padding: 0.75rem 1rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E2E8F0; text-align: right;">≈ VND</th>
+                            <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #E2E8F0;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in assets %}
+                        {% set u = a.unit.upper() %}
+                        {% set vnd_val = a.amount if u == 'VND' else (a.amount * converters[u] if u in converters else none) %}
+                        <tr class="asset-view-row" id="assetRow{{ a.id }}">
+                            <td style="padding: 0.75rem 1rem; border-bottom: 1px solid #F1F5F9; vertical-align: middle;">
+                                <div style="font-weight: 600; color: var(--tcb-navy);">{{ a.name }}</div>
+                                {% if a.description %}<div style="font-size: 0.75rem; color: #94A3B8;">{{ a.description }}</div>{% endif %}
+                            </td>
+                            <td style="padding: 0.75rem 1rem; border-bottom: 1px solid #F1F5F9; text-align: right; vertical-align: middle;">
+                                <span style="font-weight: 700; color: #059669;">{{ "{:,.0f}".format(a.amount) }}</span>
+                                <span style="font-size: 0.72rem; color: #94A3B8; margin-left: 0.2rem;">{{ a.unit }}</span>
+                            </td>
+                            <td style="padding: 0.75rem 1rem; border-bottom: 1px solid #F1F5F9; text-align: right; vertical-align: middle;">
+                                {% if u == 'VND' %}
+                                <span style="color: #94A3B8; font-size: 0.78rem;">—</span>
+                                {% elif vnd_val is not none %}
+                                <span style="font-weight: 600; color: #334155; font-size: 0.82rem;">{{ "{:,.0f}".format(vnd_val) }}</span>
+                                {% else %}
+                                <span style="color: #D97706; font-size: 0.75rem;" title="No converter defined for {{ a.unit }}"><i class="bi bi-exclamation-triangle-fill"></i> no rate</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 0.75rem 1rem; border-bottom: 1px solid #F1F5F9; white-space: nowrap; vertical-align: middle;">
+                                <button onclick="openAssetEdit({{ a.id }})" style="background: #F1F5F9; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #475569; cursor: pointer;" title="Edit"><i class="bi bi-pencil-fill" style="font-size: 0.8rem;"></i></button>
+                                <button onclick="deleteAsset({{ a.id }}, this)" style="background: #FEF2F2; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #DC2626; cursor: pointer;" title="Delete"><i class="bi bi-trash-fill" style="font-size: 0.8rem;"></i></button>
+                            </td>
+                        </tr>
+                        <tr class="asset-row-edit" id="assetEdit{{ a.id }}">
+                            <td colspan="4" style="padding: 0.75rem 1rem; border-bottom: 1px solid #F1F5F9;">
+                                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: flex-end;">
+                                    <div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748B; margin-bottom: 0.2rem;">Name</div>
+                                        <input type="text" id="eName{{ a.id }}" value="{{ a.name }}" class="form-control form-control-sm" style="width: 140px; border-radius: 6px; font-size: 0.78rem;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748B; margin-bottom: 0.2rem;">Amount</div>
+                                        <input type="number" id="eAmount{{ a.id }}" value="{{ a.amount }}" step="any" min="0" class="form-control form-control-sm" style="width: 120px; border-radius: 6px; font-size: 0.78rem;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748B; margin-bottom: 0.2rem;">Unit</div>
+                                        <input type="text" id="eUnit{{ a.id }}" value="{{ a.unit }}" class="form-control form-control-sm" style="width: 80px; border-radius: 6px; font-size: 0.78rem;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748B; margin-bottom: 0.2rem;">Description</div>
+                                        <input type="text" id="eDesc{{ a.id }}" value="{{ a.description or '' }}" placeholder="Optional" class="form-control form-control-sm" style="width: 160px; border-radius: 6px; font-size: 0.78rem;">
+                                    </div>
+                                    <button onclick="saveAssetEdit({{ a.id }}, this)" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 6px; font-size: 0.78rem; padding: 0.3rem 0.7rem;">Save</button>
+                                    <button onclick="cancelAssetEdit({{ a.id }})" class="btn btn-sm" style="background: #F1F5F9; color: #475569; border-radius: 6px; font-size: 0.78rem; padding: 0.3rem 0.7rem;">Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('addAssetForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('assetName').value.trim(),
+        amount: parseFloat(document.getElementById('assetAmount').value),
+        unit: document.getElementById('assetUnit').value.trim() || 'VND',
+        description: document.getElementById('assetDesc').value.trim(),
+    };
+    const resp = await fetch('/api/assets', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+});
+
+function openAssetEdit(id) {
+    document.getElementById('assetRow' + id).style.display = 'none';
+    document.getElementById('assetEdit' + id).style.display = 'table-row';
+}
+function cancelAssetEdit(id) {
+    document.getElementById('assetEdit' + id).style.display = 'none';
+    document.getElementById('assetRow' + id).style.display = 'table-row';
+}
+async function saveAssetEdit(id, btn) {
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('eName' + id).value.trim(),
+        amount: parseFloat(document.getElementById('eAmount' + id).value),
+        unit: document.getElementById('eUnit' + id).value.trim() || 'VND',
+        description: document.getElementById('eDesc' + id).value.trim(),
+    };
+    const resp = await fetch('/api/assets/' + id, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+async function deleteAsset(id, btn) {
+    if (!confirm('Delete this asset?')) return;
+    btn.disabled = true;
+    const resp = await fetch('/api/assets/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+</script>
+{% endblock %}

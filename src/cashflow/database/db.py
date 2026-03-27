@@ -169,6 +169,36 @@ CREATE TABLE IF NOT EXISTS investment_items (
 
 CREATE INDEX IF NOT EXISTS idx_inv_items_inv ON investment_items(investment_id);
 CREATE INDEX IF NOT EXISTS idx_inv_items_date ON investment_items(date);
+
+CREATE TABLE IF NOT EXISTS pays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pay_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pay_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT,
+    paid INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (pay_id) REFERENCES pays(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pay_items_pay ON pay_items(pay_id);
+CREATE INDEX IF NOT EXISTS idx_pay_items_date ON pay_items(date);
+
+CREATE TABLE IF NOT EXISTS assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    amount REAL NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL DEFAULT 'VND',
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -348,6 +378,42 @@ def _migrate(conn: sqlite3.Connection) -> None:
     }
     if existing_inv_cols and "unit" not in existing_inv_cols:
         conn.execute("ALTER TABLE investments ADD COLUMN unit TEXT NOT NULL DEFAULT 'VND'")
+
+    # Create pays and pay_items tables if they don't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pays (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pay_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pay_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            paid INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (pay_id) REFERENCES pays(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pay_items_pay ON pay_items(pay_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pay_items_date ON pay_items(date)")
+
+    # Create assets table if it doesn't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS assets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            amount REAL NOT NULL DEFAULT 0,
+            unit TEXT NOT NULL DEFAULT 'VND',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
 
     for sql in migrations:
         conn.execute(sql)

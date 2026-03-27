@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block page_title %}Portfolios{% endblock %}
+
+{% block content %}
+
+{# ── Compute totals ── #}
+{% set ns = namespace(
+    assets_vnd=0,
+    assets_unconverted=false,
+    investments_vnd=0,
+    investments_unconverted=false,
+    savings_vnd=0,
+    pays_unpaid_vnd=0
+) %}
+
+{% for a in assets %}
+    {% set u = a.unit.upper() %}
+    {% if u == 'VND' %}
+        {% set ns.assets_vnd = ns.assets_vnd + a.amount %}
+    {% elif u in converters %}
+        {% set ns.assets_vnd = ns.assets_vnd + a.amount * converters[u] %}
+    {% else %}
+        {% set ns.assets_unconverted = true %}
+    {% endif %}
+{% endfor %}
+
+{% for inv in investments %}
+    {% set u = inv.unit.upper() %}
+    {% if u == 'VND' %}
+        {% set ns.investments_vnd = ns.investments_vnd + inv.total_invested %}
+    {% elif u in converters %}
+        {% set ns.investments_vnd = ns.investments_vnd + inv.total_invested * converters[u] %}
+    {% else %}
+        {% set ns.investments_unconverted = true %}
+    {% endif %}
+{% endfor %}
+
+{% for s in savings %}
+    {% set ns.savings_vnd = ns.savings_vnd + s.current_principal %}
+{% endfor %}
+
+{% for p in pays %}
+    {% for item in p.entries %}
+        {% if not item.paid %}
+            {% set ns.pays_unpaid_vnd = ns.pays_unpaid_vnd + item.amount %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+
+{% set net_worth = ns.assets_vnd + ns.investments_vnd + ns.savings_vnd %}
+
+{# ── Net Worth Hero ── #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div style="background: linear-gradient(135deg, var(--tcb-navy), #1E3A5F); border-radius: 18px; padding: 2rem 2.5rem; color: #fff; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem;">Estimated Net Worth</div>
+                <div style="font-size: 2.4rem; font-weight: 800; line-height: 1.1;">{{ "{:,.0f}".format(net_worth) }} <span style="font-size: 1rem; color: #94A3B8;">VND</span></div>
+                {% if ns.assets_unconverted or ns.investments_unconverted %}
+                <div style="font-size: 0.75rem; color: #D97706; margin-top: 0.4rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Some assets/investments have no VND converter — excluded from total</div>
+                {% endif %}
+            </div>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                <div style="text-align: center;">
+                    <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Assets</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #6EE7B7;">+{{ "{:,.0f}".format(ns.assets_vnd) }}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Investments</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #93C5FD;">+{{ "{:,.0f}".format(ns.investments_vnd) }}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Savings</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #FDE68A;">+{{ "{:,.0f}".format(ns.savings_vnd) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    {# ── Assets ── #}
+    <div class="col-lg-6">
+        <div class="card" style="height: 100%;">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-bank me-2" style="color:#7C3AED;"></i>Assets</h6>
+                <a href="{{ url_for('main.assets') }}" style="font-size:0.75rem;color:#64748B;text-decoration:none;font-weight:600;">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div style="padding: 0.75rem 0;">
+                {% if not assets %}
+                <div style="text-align:center;color:#94A3B8;padding:1.5rem;font-size:0.85rem;">No assets defined</div>
+                {% else %}
+                {% for a in assets %}
+                {% set u = a.unit.upper() %}
+                {% set vnd_val = a.amount if u == 'VND' else (a.amount * converters[u] if u in converters else none) %}
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 1.25rem;border-bottom:1px solid #F8FAFC;">
+                    <div>
+                        <span style="font-weight:600;font-size:0.85rem;color:var(--tcb-navy);">{{ a.name }}</span>
+                        {% if a.description %}<span style="font-size:0.75rem;color:#94A3B8;margin-left:0.4rem;">{{ a.description }}</span>{% endif %}
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;font-size:0.85rem;color:#059669;">{{ "{:,.0f}".format(a.amount) }} <span style="font-size:0.7rem;color:#94A3B8;">{{ a.unit }}</span></div>
+                        {% if vnd_val is not none and u != 'VND' %}
+                        <div style="font-size:0.72rem;color:#64748B;">≈ {{ "{:,.0f}".format(vnd_val) }} VND</div>
+                        {% elif vnd_val is none %}
+                        <div style="font-size:0.7rem;color:#D97706;"><i class="bi bi-exclamation-triangle-fill"></i> no rate</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div style="display:flex;justify-content:space-between;padding:0.6rem 1.25rem;background:#F8FAFC;">
+                    <span style="font-size:0.78rem;font-weight:700;color:#64748B;">Total (VND)</span>
+                    <span style="font-size:0.85rem;font-weight:800;color:#059669;">{{ "{:,.0f}".format(ns.assets_vnd) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ── Investments ── #}
+    <div class="col-lg-6">
+        <div class="card" style="height: 100%;">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-graph-up-arrow me-2" style="color:#2563EB;"></i>Investments</h6>
+                <a href="{{ url_for('main.investments') }}" style="font-size:0.75rem;color:#64748B;text-decoration:none;font-weight:600;">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div style="padding: 0.75rem 0;">
+                {% if not investments %}
+                <div style="text-align:center;color:#94A3B8;padding:1.5rem;font-size:0.85rem;">No investments defined</div>
+                {% else %}
+                {% for inv in investments %}
+                {% set u = inv.unit.upper() %}
+                {% set vnd_val = inv.total_invested if u == 'VND' else (inv.total_invested * converters[u] if u in converters else none) %}
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 1.25rem;border-bottom:1px solid #F8FAFC;">
+                    <div>
+                        <span style="font-weight:600;font-size:0.85rem;color:var(--tcb-navy);">{{ inv.name }}</span>
+                        <span style="font-size:0.7rem;font-weight:700;background:#EDE9FE;color:#7C3AED;border-radius:4px;padding:0.1rem 0.4rem;margin-left:0.4rem;">{{ inv.unit }}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;font-size:0.85rem;color:#2563EB;">{{ "{:,.0f}".format(inv.total_invested) }} <span style="font-size:0.7rem;color:#94A3B8;">{{ inv.unit }}</span></div>
+                        {% if vnd_val is not none and u != 'VND' %}
+                        <div style="font-size:0.72rem;color:#64748B;">≈ {{ "{:,.0f}".format(vnd_val) }} VND</div>
+                        {% elif vnd_val is none %}
+                        <div style="font-size:0.7rem;color:#D97706;"><i class="bi bi-exclamation-triangle-fill"></i> no rate</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                <div style="display:flex;justify-content:space-between;padding:0.6rem 1.25rem;background:#F8FAFC;">
+                    <span style="font-size:0.78rem;font-weight:700;color:#64748B;">Total (VND equiv.)</span>
+                    <span style="font-size:0.85rem;font-weight:800;color:#2563EB;">{{ "{:,.0f}".format(ns.investments_vnd) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ── Savings ── #}
+    <div class="col-lg-6">
+        <div class="card" style="height: 100%;">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-piggy-bank me-2" style="color:#D97706;"></i>Savings</h6>
+                <a href="{{ url_for('main.savings') }}" style="font-size:0.75rem;color:#64748B;text-decoration:none;font-weight:600;">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div style="padding: 0.75rem 0;">
+                {% if not savings %}
+                <div style="text-align:center;color:#94A3B8;padding:1.5rem;font-size:0.85rem;">No savings defined</div>
+                {% else %}
+                {% for s in savings %}
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 1.25rem;border-bottom:1px solid #F8FAFC;">
+                    <div>
+                        <span style="font-weight:600;font-size:0.85rem;color:var(--tcb-navy);">{{ s.name }}</span>
+                        <span style="font-size:0.7rem;font-weight:700;margin-left:0.4rem;border-radius:4px;padding:0.1rem 0.4rem;
+                            {% if s.status == 'active' %}background:#D1FAE5;color:#059669;{% else %}background:#FEF2F2;color:#DC2626;{% endif %}">
+                            {{ s.status | capitalize }}
+                        </span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;font-size:0.85rem;color:#D97706;">{{ "{:,.0f}".format(s.current_principal) }} <span style="font-size:0.7rem;color:#94A3B8;">VND</span></div>
+                        <div style="font-size:0.72rem;color:#94A3B8;">{{ s.annual_rate }}% · {{ s.term_months }}mo</div>
+                    </div>
+                </div>
+                {% endfor %}
+                <div style="display:flex;justify-content:space-between;padding:0.6rem 1.25rem;background:#F8FAFC;">
+                    <span style="font-size:0.78rem;font-weight:700;color:#64748B;">Total principal (VND)</span>
+                    <span style="font-size:0.85rem;font-weight:800;color:#D97706;">{{ "{:,.0f}".format(ns.savings_vnd) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

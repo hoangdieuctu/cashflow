@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block page_title %}Pays{% endblock %}
+
+{% block content %}
+<style>
+.pay-card { transition: border-color 0.15s, box-shadow 0.15s; }
+.pay-card:hover { border-color: #CBD5E1 !important; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.pay-edit { display: none; }
+.item-edit-row { display: none; background: #F8FAFC; }
+.add-item-row td { background: #F8FAFC; padding: 0.5rem 0.75rem !important; }
+.item-paid td { opacity: 0.55; }
+.item-paid .item-amount { text-decoration: line-through; color: #94A3B8 !important; }
+</style>
+
+<div class="row g-4">
+
+    <!-- Left: New Pay form -->
+    <div class="col-lg-4">
+        <div class="card" style="padding: 1.25rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 1rem;">
+                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>New Pay Tracker
+            </h6>
+            <form id="addPayForm">
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+                    <input type="text" class="form-control form-control-sm" id="payName" placeholder="e.g. Rent, Electricity" style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Description (optional)</label>
+                    <input type="text" class="form-control form-control-sm" id="payDesc" placeholder="Short description" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.55rem;">
+                    <i class="bi bi-plus-circle me-1"></i>Add Pay Tracker
+                </button>
+            </form>
+        </div>
+
+        {% if pays %}
+        <div class="card" style="padding: 1.25rem; margin-top: 1rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 0.75rem; font-size: 0.85rem;">Summary</h6>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748B;">Trackers</span>
+                    <span style="font-weight: 600; color: var(--tcb-navy);">{{ pays | length }}</span>
+                </div>
+                {% set total_unpaid = pays | sum(attribute='unpaid_count') %}
+                {% if total_unpaid > 0 %}
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; padding-top: 0.25rem; border-top: 1px solid #F1F5F9;">
+                    <span style="color: #64748B;">Unpaid items</span>
+                    <span style="font-weight: 700; color: #DC2626;">{{ total_unpaid }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Pay cards -->
+    <div class="col-lg-8">
+        {% if not pays %}
+        <div style="text-align: center; padding: 4rem 2rem; color: #94A3B8;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.4;"><i class="bi bi-calendar-check"></i></div>
+            <h5 style="color: #64748B; font-weight: 700;">No pay trackers yet</h5>
+            <p style="font-size: 0.85rem;">Create a pay tracker to manage your recurring payments.</p>
+        </div>
+        {% endif %}
+
+        {% for pay in pays %}
+        <div class="card pay-card" data-pay-id="{{ pay.id }}" style="margin-bottom: 1.25rem; padding: 0;">
+
+            <!-- View mode -->
+            <div class="pay-view" id="payView{{ pay.id }}" style="padding: 1.25rem;">
+                <!-- Header -->
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 700; font-size: 1rem; color: var(--tcb-navy);">{{ pay.name }}</div>
+                        {% if pay.description %}
+                        <div style="font-size: 0.78rem; color: #94A3B8; margin-top: 0.1rem;">{{ pay.description }}</div>
+                        {% endif %}
+                    </div>
+                    <div style="text-align: right; flex-shrink: 0;">
+                        {% if pay.unpaid_count > 0 %}
+                        <div style="font-size: 0.72rem; font-weight: 700; background: #FEF2F2; color: #DC2626; border-radius: 6px; padding: 0.15rem 0.5rem; display: inline-block;">{{ pay.unpaid_count }} unpaid</div>
+                        {% else %}
+                        <div style="font-size: 0.72rem; font-weight: 700; background: #F0FDF4; color: #16A34A; border-radius: 6px; padding: 0.15rem 0.5rem; display: inline-block;"><i class="bi bi-check-circle-fill me-1"></i>All paid</div>
+                        {% endif %}
+                    </div>
+                    <button onclick="openPayEdit({{ pay.id }})" style="background: #F1F5F9; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #475569; cursor: pointer;" title="Edit"><i class="bi bi-pencil-fill" style="font-size: 0.8rem;"></i></button>
+                    <button onclick="deletePay({{ pay.id }}, this)" style="background: #FEF2F2; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #DC2626; cursor: pointer;" title="Delete"><i class="bi bi-trash-fill" style="font-size: 0.8rem;"></i></button>
+                </div>
+
+                <!-- Items table -->
+                <div style="border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden;">
+                    <table class="table table-sm mb-0" style="font-size: 0.82rem;">
+                        <thead>
+                            <tr style="background: #F8FAFC;">
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Due Date</th>
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0; text-align: right;">Amount</th>
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Note</th>
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Status</th>
+                                <th style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #E2E8F0;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in pay.entries %}
+                            {% set days_left = (item.date | todatetime - now_date | todatetime).days %}
+                            <tr class="item-row {% if item.paid %}item-paid{% endif %}" id="itemRow{{ item.id }}">
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; color: #475569;">
+                                    {{ item.date }}
+                                    {% if not item.paid %}
+                                        {% if days_left < 0 %}
+                                        <span style="font-size: 0.65rem; font-weight: 700; color: #DC2626; margin-left: 0.3rem;">overdue</span>
+                                        {% elif days_left <= 7 %}
+                                        <span style="font-size: 0.65rem; font-weight: 700; color: #D97706; margin-left: 0.3rem;">{{ days_left }}d left</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; text-align: right;" class="item-amount">
+                                    <span style="font-weight: 600; color: {% if item.paid %}#94A3B8{% else %}var(--tcb-navy){% endif %};">{{ "{:,.0f}".format(item.amount) }}</span>
+                                </td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; color: #94A3B8; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.note or '' }}</td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9;">
+                                    {% if item.paid %}
+                                    <span style="font-size: 0.7rem; font-weight: 700; background: #F0FDF4; color: #16A34A; border-radius: 5px; padding: 0.15rem 0.45rem;"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
+                                    {% else %}
+                                        {% if days_left < 0 %}
+                                        <span style="font-size: 0.7rem; font-weight: 700; background: #FEF2F2; color: #DC2626; border-radius: 5px; padding: 0.15rem 0.45rem;">Overdue</span>
+                                        {% elif days_left <= 7 %}
+                                        <span style="font-size: 0.7rem; font-weight: 700; background: #FEF3C7; color: #D97706; border-radius: 5px; padding: 0.15rem 0.45rem;">Due soon</span>
+                                        {% else %}
+                                        <span style="font-size: 0.7rem; font-weight: 700; background: #F1F5F9; color: #64748B; border-radius: 5px; padding: 0.15rem 0.45rem;">Unpaid</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; white-space: nowrap;">
+                                    <button onclick="togglePaid({{ pay.id }}, {{ item.id }}, {{ 'false' if item.paid else 'true' }}, this)"
+                                        style="background: none; border: none; cursor: pointer; padding: 0.1rem 0.3rem;"
+                                        title="{{ 'Mark unpaid' if item.paid else 'Mark paid' }}">
+                                        <i class="bi {% if item.paid %}bi-arrow-counterclockwise{% else %}bi-check-circle{% endif %}" style="font-size: 0.9rem; color: {% if item.paid %}#94A3B8{% else %}#059669{% endif %};"></i>
+                                    </button>
+                                    <button onclick="openItemEdit({{ pay.id }}, {{ item.id }})" style="background:none;border:none;color:#64748B;cursor:pointer;padding:0.1rem 0.3rem;" title="Edit"><i class="bi bi-pencil-fill" style="font-size:0.75rem;"></i></button>
+                                    <button onclick="deleteItem({{ pay.id }}, {{ item.id }}, this)" style="background:none;border:none;color:#DC2626;cursor:pointer;padding:0.1rem 0.3rem;" title="Delete"><i class="bi bi-trash-fill" style="font-size:0.75rem;"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="item-edit-row" id="itemEdit{{ item.id }}">
+                                <td colspan="5" style="padding: 0.6rem 0.75rem; border-bottom: 1px solid #F1F5F9;">
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                                        <input type="date" id="ieDate{{ item.id }}" value="{{ item.date }}" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="number" id="ieAmount{{ item.id }}" value="{{ item.amount }}" placeholder="Amount" step="any" min="0" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="text" id="ieNote{{ item.id }}" value="{{ item.note or '' }}" placeholder="Note (optional)" class="form-control form-control-sm" style="width: 160px; border-radius: 6px; font-size: 0.78rem;">
+                                        <button onclick="saveItemEdit({{ pay.id }}, {{ item.id }}, this)" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;">Save</button>
+                                        <button onclick="cancelItemEdit({{ item.id }})" class="btn btn-sm" style="background: #F1F5F9; color: #475569; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;">Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+
+                            <!-- Add item row -->
+                            <tr class="add-item-row">
+                                <td colspan="5">
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                                        <input type="date" id="newDate{{ pay.id }}" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="number" id="newAmount{{ pay.id }}" placeholder="Amount" step="any" min="0" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="text" id="newNote{{ pay.id }}" placeholder="Note (optional)" class="form-control form-control-sm" style="width: 160px; border-radius: 6px; font-size: 0.78rem;">
+                                        <button onclick="addItem({{ pay.id }}, this)" class="btn btn-sm" style="background: #059669; color: #fff; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;"><i class="bi bi-plus"></i> Add</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Edit mode -->
+            <div class="pay-edit" id="payEdit{{ pay.id }}" style="padding: 1.25rem; background: #F8FAFC; border-radius: inherit;">
+                <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 0.75rem; font-size: 0.88rem;">Edit Pay Tracker</h6>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+                    <input type="text" id="editName{{ pay.id }}" value="{{ pay.name }}" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Description</label>
+                    <input type="text" id="editDesc{{ pay.id }}" value="{{ pay.description or '' }}" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="savePayEdit({{ pay.id }}, this)" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.45rem 1rem;">Save</button>
+                    <button onclick="cancelPayEdit({{ pay.id }})" class="btn btn-sm" style="background: #F1F5F9; color: #475569; border-radius: 8px; font-weight: 700; padding: 0.45rem 1rem;">Cancel</button>
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const today = new Date().toISOString().slice(0, 10);
+document.querySelectorAll('[id^="newDate"]').forEach(el => { if (!el.value) el.value = today; });
+
+document.getElementById('addPayForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('payName').value.trim(),
+        description: document.getElementById('payDesc').value.trim(),
+    };
+    const resp = await fetch('/api/pays', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+});
+
+function openPayEdit(id) {
+    document.getElementById('payView' + id).style.display = 'none';
+    document.getElementById('payEdit' + id).style.display = 'block';
+}
+function cancelPayEdit(id) {
+    document.getElementById('payEdit' + id).style.display = 'none';
+    document.getElementById('payView' + id).style.display = 'block';
+}
+async function savePayEdit(id, btn) {
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('editName' + id).value.trim(),
+        description: document.getElementById('editDesc' + id).value.trim(),
+    };
+    const resp = await fetch('/api/pays/' + id, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+async function deletePay(id, btn) {
+    if (!confirm('Delete this pay tracker and all its items?')) return;
+    btn.disabled = true;
+    const resp = await fetch('/api/pays/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+async function addItem(payId, btn) {
+    btn.disabled = true;
+    const amount = parseFloat(document.getElementById('newAmount' + payId).value);
+    const date = document.getElementById('newDate' + payId).value;
+    if (!date || !amount) { alert('Date and amount are required'); btn.disabled = false; return; }
+    const body = { date, amount, note: document.getElementById('newNote' + payId).value.trim() };
+    const resp = await fetch('/api/pays/' + payId + '/items', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+function openItemEdit(payId, itemId) {
+    document.getElementById('itemRow' + itemId).style.display = 'none';
+    document.getElementById('itemEdit' + itemId).style.display = 'table-row';
+}
+function cancelItemEdit(itemId) {
+    document.getElementById('itemEdit' + itemId).style.display = 'none';
+    document.getElementById('itemRow' + itemId).style.display = 'table-row';
+}
+async function saveItemEdit(payId, itemId, btn) {
+    btn.disabled = true;
+    const body = {
+        date: document.getElementById('ieDate' + itemId).value,
+        amount: parseFloat(document.getElementById('ieAmount' + itemId).value),
+        note: document.getElementById('ieNote' + itemId).value.trim(),
+    };
+    const resp = await fetch('/api/pays/' + payId + '/items/' + itemId, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+async function deleteItem(payId, itemId, btn) {
+    if (!confirm('Delete this item?')) return;
+    btn.disabled = true;
+    const resp = await fetch('/api/pays/' + payId + '/items/' + itemId, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+async function togglePaid(payId, itemId, paid, btn) {
+    btn.disabled = true;
+    const resp = await fetch('/api/pays/' + payId + '/items/' + itemId + '/paid', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ paid })
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+</script>
+{% endblock %}
