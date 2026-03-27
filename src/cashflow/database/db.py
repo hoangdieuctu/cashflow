@@ -124,6 +124,51 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS extra_fees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    statuses TEXT NOT NULL DEFAULT '',
+    total_amount REAL DEFAULT NULL,
+    deadline TEXT DEFAULT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS extra_fee_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fee_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    name TEXT NOT NULL,
+    note TEXT,
+    status TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (fee_id) REFERENCES extra_fees(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_fee_entries_fee ON extra_fee_entries(fee_id);
+CREATE INDEX IF NOT EXISTS idx_fee_entries_date ON extra_fee_entries(date);
+
+CREATE TABLE IF NOT EXISTS investments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    unit TEXT NOT NULL DEFAULT 'VND',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS investment_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    investment_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (investment_id) REFERENCES investments(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_inv_items_inv ON investment_items(investment_id);
+CREATE INDEX IF NOT EXISTS idx_inv_items_date ON investment_items(date);
 """
 
 
@@ -239,6 +284,70 @@ def _migrate(conn: sqlite3.Connection) -> None:
             value TEXT
         )
     """)
+
+    # Create extra_fees and extra_fee_entries tables if they don't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS extra_fees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            statuses TEXT NOT NULL DEFAULT '',
+            total_amount REAL DEFAULT NULL,
+            deadline TEXT DEFAULT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS extra_fee_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fee_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            name TEXT NOT NULL,
+            note TEXT,
+            status TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (fee_id) REFERENCES extra_fees(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_fee_entries_fee ON extra_fee_entries(fee_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_fee_entries_date ON extra_fee_entries(date)")
+
+    existing_fee_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(extra_fees)").fetchall()
+        if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='extra_fees'").fetchone()
+    }
+    if existing_fee_cols and "deadline" not in existing_fee_cols:
+        conn.execute("ALTER TABLE extra_fees ADD COLUMN deadline TEXT DEFAULT NULL")
+
+    # Create investments and investment_items tables if they don't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS investments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS investment_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            investment_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (investment_id) REFERENCES investments(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_inv_items_inv ON investment_items(investment_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_inv_items_date ON investment_items(date)")
+
+    existing_inv_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(investments)").fetchall()
+        if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='investments'").fetchone()
+    }
+    if existing_inv_cols and "unit" not in existing_inv_cols:
+        conn.execute("ALTER TABLE investments ADD COLUMN unit TEXT NOT NULL DEFAULT 'VND'")
 
     for sql in migrations:
         conn.execute(sql)

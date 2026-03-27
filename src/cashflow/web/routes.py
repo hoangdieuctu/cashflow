@@ -670,3 +670,262 @@ def delete_saving_withdrawal(saving_id: int, withdrawal_id: int):
     if not ok:
         return jsonify({"error": "Withdrawal not found"}), 404
     return jsonify({"ok": True})
+
+
+# ── Extra Fees ──
+
+@bp.route("/extra-fees")
+def extra_fees():
+    with _get_repo() as repo:
+        fees = repo.get_extra_fees()
+        for f in fees:
+            f["entries"] = repo.get_extra_fee_entries(f["id"])
+    return render_template("extra_fees.html", fees=fees)
+
+
+@bp.route("/api/extra-fees", methods=["POST"])
+def add_extra_fee():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    statuses = (data.get("statuses") or "").strip()
+    total_amount = data.get("total_amount")
+    deadline = (data.get("deadline") or "").strip() or None
+    if total_amount is not None:
+        try:
+            total_amount = float(total_amount)
+            if total_amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "total_amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        try:
+            fid = repo.add_extra_fee(name, statuses, total_amount, deadline)
+        except Exception:
+            return jsonify({"error": "Fee tracker name already exists"}), 409
+    return jsonify({"ok": True, "id": fid})
+
+
+@bp.route("/api/extra-fees/<int:fee_id>", methods=["PUT"])
+def update_extra_fee(fee_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = data.get("name")
+    statuses = data.get("statuses")
+    total_amount = data.get("total_amount", False)
+    deadline = data.get("deadline", False)
+    if name is not None:
+        name = name.strip()
+        if not name:
+            return jsonify({"error": "name cannot be empty"}), 400
+    if statuses is not None:
+        statuses = statuses.strip()
+    if total_amount is not False and total_amount is not None:
+        try:
+            total_amount = float(total_amount)
+            if total_amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "total_amount must be a positive number"}), 400
+    if deadline is not False:
+        deadline = (deadline or "").strip() or None
+    with _get_repo() as repo:
+        ok = repo.update_extra_fee(fee_id, name=name, statuses=statuses,
+                                   total_amount=total_amount, deadline=deadline)
+    if not ok:
+        return jsonify({"error": "Fee tracker not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/extra-fees/<int:fee_id>", methods=["DELETE"])
+def delete_extra_fee(fee_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_extra_fee(fee_id)
+    if not ok:
+        return jsonify({"error": "Fee tracker not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/extra-fees/<int:fee_id>/entries", methods=["POST"])
+def add_fee_entry(fee_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    entry_date = (data.get("date") or "").strip()
+    amount = data.get("amount")
+    name = (data.get("name") or "").strip()
+    note = (data.get("note") or "").strip()
+    status = (data.get("status") or "").strip()
+    if not entry_date:
+        return jsonify({"error": "date is required"}), 400
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        fee = repo.get_extra_fee(fee_id)
+        if not fee:
+            return jsonify({"error": "Fee tracker not found"}), 404
+        if fee["statuses_list"] and status not in fee["statuses_list"]:
+            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(fee['statuses_list'])}"}), 400
+        eid = repo.add_extra_fee_entry(fee_id, entry_date, amount, name, note, status)
+    return jsonify({"ok": True, "id": eid})
+
+
+@bp.route("/api/extra-fees/<int:fee_id>/entries/<int:entry_id>", methods=["PUT"])
+def update_fee_entry(fee_id: int, entry_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    entry_date = data.get("date")
+    amount = data.get("amount")
+    name = data.get("name")
+    note = data.get("note")
+    status = data.get("status")
+    if amount is not None:
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        if status is not None:
+            fee = repo.get_extra_fee(fee_id)
+            if not fee:
+                return jsonify({"error": "Fee tracker not found"}), 404
+            if fee["statuses_list"] and status.strip() not in fee["statuses_list"]:
+                return jsonify({"error": f"Invalid status. Must be one of: {', '.join(fee['statuses_list'])}"}), 400
+        ok = repo.update_extra_fee_entry(entry_id, date=entry_date, amount=amount,
+                                         name=name, note=note, status=status)
+    if not ok:
+        return jsonify({"error": "Entry not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/extra-fees/<int:fee_id>/entries/<int:entry_id>", methods=["DELETE"])
+def delete_fee_entry(fee_id: int, entry_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_extra_fee_entry(entry_id)
+    if not ok:
+        return jsonify({"error": "Entry not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ── Investments ──
+
+@bp.route("/investments")
+def investments():
+    with _get_repo() as repo:
+        invs = repo.get_investments()
+        for inv in invs:
+            inv["entries"] = repo.get_investment_items(inv["id"])
+    return render_template("investments.html", investments=invs)
+
+
+@bp.route("/api/investments", methods=["POST"])
+def add_investment():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    description = (data.get("description") or "").strip()
+    unit = (data.get("unit") or "VND").strip()
+    with _get_repo() as repo:
+        try:
+            iid = repo.add_investment(name, description, unit)
+        except Exception:
+            return jsonify({"error": "Investment name already exists"}), 409
+    return jsonify({"ok": True, "id": iid})
+
+
+@bp.route("/api/investments/<int:investment_id>", methods=["PUT"])
+def update_investment(investment_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    name = data.get("name")
+    description = data.get("description")
+    unit = data.get("unit")
+    if name is not None:
+        name = name.strip()
+        if not name:
+            return jsonify({"error": "name cannot be empty"}), 400
+    with _get_repo() as repo:
+        ok = repo.update_investment(investment_id, name=name, description=description, unit=unit)
+    if not ok:
+        return jsonify({"error": "Investment not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/investments/<int:investment_id>", methods=["DELETE"])
+def delete_investment(investment_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_investment(investment_id)
+    if not ok:
+        return jsonify({"error": "Investment not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/investments/<int:investment_id>/items", methods=["POST"])
+def add_investment_item(investment_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    item_date = (data.get("date") or "").strip()
+    amount = data.get("amount")
+    note = (data.get("note") or "").strip()
+    if not item_date:
+        return jsonify({"error": "date is required"}), 400
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        if not repo.get_investment(investment_id):
+            return jsonify({"error": "Investment not found"}), 404
+        iid = repo.add_investment_item(investment_id, item_date, amount, note)
+    return jsonify({"ok": True, "id": iid})
+
+
+@bp.route("/api/investments/<int:investment_id>/items/<int:item_id>", methods=["PUT"])
+def update_investment_item(investment_id: int, item_id: int):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    item_date = data.get("date")
+    amount = data.get("amount")
+    note = data.get("note")
+    if amount is not None:
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "amount must be a positive number"}), 400
+    with _get_repo() as repo:
+        ok = repo.update_investment_item(item_id, date=item_date, amount=amount, note=note)
+    if not ok:
+        return jsonify({"error": "Item not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/investments/<int:investment_id>/items/<int:item_id>", methods=["DELETE"])
+def delete_investment_item(investment_id: int, item_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_investment_item(item_id)
+    if not ok:
+        return jsonify({"error": "Item not found"}), 404
+    return jsonify({"ok": True})

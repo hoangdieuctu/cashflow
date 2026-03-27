@@ -64,42 +64,22 @@
             text-align: center;
         }
 
-        /* Keypad */
-        .keypad {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.85rem;
+        /* Password input */
+        .passcode-input {
             width: 100%;
-        }
-        .key {
-            aspect-ratio: 1;
-            border-radius: 50%;
-            border: none;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.08);
+            border: 1.5px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
             color: #fff;
-            font-size: 1.4rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: background 0.12s, transform 0.08s;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            line-height: 1;
+            font-size: 1.5rem;
+            letter-spacing: 0.4em;
+            text-align: center;
+            padding: 0.7rem 1rem;
+            outline: none;
+            transition: border-color 0.15s;
         }
-        .key:hover { background: rgba(255,255,255,0.18); }
-        .key:active { background: rgba(255,255,255,0.28); transform: scale(0.93); }
-        .key .sub {
-            font-size: 0.45rem;
-            letter-spacing: 1.5px;
-            font-weight: 700;
-            color: rgba(255,255,255,0.5);
-            text-transform: uppercase;
-            margin-top: 2px;
-        }
-        .key.empty { background: transparent; cursor: default; pointer-events: none; }
-        .key.del { background: transparent; font-size: 1.2rem; }
-        .key.del:hover { background: rgba(255,255,255,0.08); }
-        .key.del:active { background: rgba(255,255,255,0.15); transform: scale(0.93); }
+        .passcode-input:focus { border-color: rgba(255,255,255,0.5); }
+        .passcode-input::placeholder { letter-spacing: normal; font-size: 0.9rem; color: rgba(255,255,255,0.3); }
 
         /* Shake animation on error */
         @keyframes shake {
@@ -131,29 +111,16 @@
 
     <div class="error-msg" id="errMsg">{% if error %}Incorrect passcode{% endif %}</div>
 
-    <div class="keypad" id="keypad">
-        <button class="key" data-n="1">1<span class="sub">&nbsp;</span></button>
-        <button class="key" data-n="2">2<span class="sub">ABC</span></button>
-        <button class="key" data-n="3">3<span class="sub">DEF</span></button>
-        <button class="key" data-n="4">4<span class="sub">GHI</span></button>
-        <button class="key" data-n="5">5<span class="sub">JKL</span></button>
-        <button class="key" data-n="6">6<span class="sub">MNO</span></button>
-        <button class="key" data-n="7">7<span class="sub">PQRS</span></button>
-        <button class="key" data-n="8">8<span class="sub">TUV</span></button>
-        <button class="key" data-n="9">9<span class="sub">WXYZ</span></button>
-        <button class="key empty" aria-hidden="true"></button>
-        <button class="key" data-n="0">0<span class="sub">&nbsp;</span></button>
-        <button class="key del" id="delBtn" aria-label="Delete">⌫</button>
-    </div>
-
-    <form id="lockForm" method="POST" action="{{ url_for('main.lock', next=request.args.get('next', '')) }}" style="display:none;">
-        <input type="hidden" name="passcode" id="passcodeInput">
+    <form id="lockForm" method="POST" action="{{ url_for('main.lock', next=request.args.get('next', '')) }}">
+        <input type="password" name="passcode" id="passcodeInput"
+               class="passcode-input" maxlength="6" inputmode="numeric"
+               pattern="[0-9]*" autocomplete="current-password"
+               placeholder="Enter passcode" autofocus>
     </form>
 </div>
 
 <script>
-    const MAX_LEN = 6;
-    let code = '';
+    const input = document.getElementById('passcodeInput');
     const dots = document.querySelectorAll('.dot');
     const dotsWrap = document.getElementById('dots');
     const errMsg = document.getElementById('errMsg');
@@ -170,41 +137,19 @@
     {% endif %}
 
     function updateDots() {
+        const len = input.value.length;
         dots.forEach((d, i) => {
-            d.classList.toggle('filled', i < code.length);
+            d.classList.toggle('filled', i < len);
             d.classList.remove('error');
         });
     }
 
-    function submit() {
-        document.getElementById('passcodeInput').value = code;
-        document.getElementById('lockForm').submit();
-    }
-
-    document.querySelectorAll('.key[data-n]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (code.length >= MAX_LEN) return;
-            code += btn.dataset.n;
-            updateDots();
-            if (code.length === MAX_LEN) {
-                setTimeout(submit, 120);
-            }
-        });
-    });
-
-    document.getElementById('delBtn').addEventListener('click', () => {
-        code = code.slice(0, -1);
+    input.addEventListener('input', () => {
+        // Strip non-digits
+        input.value = input.value.replace(/\D/g, '').slice(0, 6);
         updateDots();
-    });
-
-    document.addEventListener('keydown', e => {
-        if (e.key >= '0' && e.key <= '9' && code.length < MAX_LEN) {
-            code += e.key;
-            updateDots();
-            if (code.length === MAX_LEN) setTimeout(submit, 120);
-        } else if (e.key === 'Backspace') {
-            code = code.slice(0, -1);
-            updateDots();
+        if (input.value.length === 6) {
+            setTimeout(() => input.closest('form').submit(), 120);
         }
     });
 </script>

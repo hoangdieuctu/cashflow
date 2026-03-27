@@ -238,6 +238,15 @@
                 <span style="margin-left:auto;background:#E4002B;color:#fff;font-size:0.62rem;font-weight:700;border-radius:10px;padding:0.05rem 0.45rem;line-height:1.6;">{{ savings_maturing_this_month }}</span>
                 {% endif %}
             </a>
+            <a href="{{ url_for('main.extra_fees') }}" class="{% if request.endpoint == 'main.extra_fees' %}active{% endif %}">
+                <i class="bi bi-receipt-cutoff"></i> Extra Fees
+                {% if extra_fees_warning_count > 0 %}
+                <span style="margin-left:auto;background:#D97706;color:#fff;font-size:0.62rem;font-weight:700;border-radius:10px;padding:0.05rem 0.45rem;line-height:1.6;">{{ extra_fees_warning_count }}</span>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('main.investments') }}" class="{% if request.endpoint == 'main.investments' %}active{% endif %}">
+                <i class="bi bi-graph-up-arrow"></i> Investments
+            </a>
             <a href="{{ url_for('main.settings') }}" class="{% if request.endpoint == 'main.settings' %}active{% endif %}">
                 <i class="bi bi-gear-fill"></i> Settings
             </a>
@@ -248,7 +257,7 @@
                 <i class="bi bi-lock-fill" style="font-size:0.9rem;"></i> Lock Now
             </a>
             {% endif %}
-            v1.0.8
+            v1.0.10
         </div>
     </aside>
 

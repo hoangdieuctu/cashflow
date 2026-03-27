@@ -84,6 +84,37 @@ def create_app(db_path: str | None = None) -> Flask:
         except Exception:
             result["savings_maturing_this_month"] = 0
 
+        # Extra fees nearing deadline (within 31 days)
+        try:
+            today = date.today()
+            conn = get_connection(app.config["DB_PATH"])
+            rows = conn.execute(
+                "SELECT deadline FROM extra_fees WHERE deadline IS NOT NULL AND deadline != ''"
+            ).fetchall()
+            conn.close()
+            warn_count = 0
+            for r in rows:
+                try:
+                    dl = date.fromisoformat(r["deadline"])
+                    if (dl - today).days <= 31:
+                        warn_count += 1
+                except (ValueError, TypeError):
+                    pass
+            result["extra_fees_warning_count"] = warn_count
+        except Exception:
+            result["extra_fees_warning_count"] = 0
+
+        result["now_date"] = date.today().isoformat()
         return result
+
+    @app.template_filter("todatetime")
+    def todatetime_filter(value):
+        from datetime import date
+        if isinstance(value, date):
+            return value
+        try:
+            return date.fromisoformat(value)
+        except (TypeError, ValueError):
+            return date.today()
 
     return app

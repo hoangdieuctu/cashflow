@@ -53,7 +53,7 @@
     </div>
 </div>
 
-<!-- Keypad Modal -->
+<!-- Passcode Modal -->
 <div id="keypadOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.7);z-index:1000;align-items:center;justify-content:center;">
     <div style="background:#1E293B;border-radius:24px;padding:2rem 1.5rem;width:100%;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:1.25rem;">
 
@@ -72,21 +72,11 @@
 
         <div id="kpError" style="color:#F87171;font-size:0.78rem;font-weight:600;height:1em;text-align:center;"></div>
 
-        <!-- Keypad -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.65rem;width:100%;">
-            <button class="kp-key" data-n="1">1<span class="kp-sub">&nbsp;</span></button>
-            <button class="kp-key" data-n="2">2<span class="kp-sub">ABC</span></button>
-            <button class="kp-key" data-n="3">3<span class="kp-sub">DEF</span></button>
-            <button class="kp-key" data-n="4">4<span class="kp-sub">GHI</span></button>
-            <button class="kp-key" data-n="5">5<span class="kp-sub">JKL</span></button>
-            <button class="kp-key" data-n="6">6<span class="kp-sub">MNO</span></button>
-            <button class="kp-key" data-n="7">7<span class="kp-sub">PQRS</span></button>
-            <button class="kp-key" data-n="8">8<span class="kp-sub">TUV</span></button>
-            <button class="kp-key" data-n="9">9<span class="kp-sub">WXYZ</span></button>
-            <button class="kp-key kp-empty" style="opacity:0;pointer-events:none;"></button>
-            <button class="kp-key" data-n="0">0<span class="kp-sub">&nbsp;</span></button>
-            <button class="kp-key kp-del" id="kpDel">⌫</button>
-        </div>
+        <input type="password" id="kpInput" inputmode="numeric" pattern="[0-9]*"
+               maxlength="6" autocomplete="one-time-code" placeholder="Enter passcode"
+               style="width:100%;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.2);
+                      border-radius:10px;color:#fff;font-size:1.4rem;letter-spacing:0.4em;text-align:center;
+                      padding:0.6rem 1rem;outline:none;transition:border-color 0.15s;">
 
         <button onclick="closePanel()" style="background:transparent;border:none;color:#64748B;font-size:0.8rem;font-weight:600;cursor:pointer;padding:0.25rem 1rem;">Cancel</button>
     </div>
@@ -101,56 +91,41 @@
 }
 .kp-dot.filled { background:#fff;border-color:#fff;transform:scale(1.1); }
 .kp-dot.error { background:#E4002B;border-color:#E4002B; }
-.kp-key {
-    aspect-ratio:1;border-radius:50%;border:none;
-    background:rgba(255,255,255,0.1);color:#fff;
-    font-size:1.3rem;font-weight:600;cursor:pointer;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    transition:background 0.1s,transform 0.08s;
-    user-select:none;line-height:1;
-}
-.kp-key:hover { background:rgba(255,255,255,0.18); }
-.kp-key:active { background:rgba(255,255,255,0.28);transform:scale(0.92); }
-.kp-sub { font-size:0.42rem;letter-spacing:1.5px;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;margin-top:2px; }
-.kp-del { background:transparent;font-size:1.1rem; }
-.kp-del:hover { background:rgba(255,255,255,0.08); }
 @keyframes kpShake {
     0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
 }
 .kp-shake { animation:kpShake 0.38s ease; }
+#kpInput:focus { border-color:rgba(255,255,255,0.5); }
+#kpInput::placeholder { letter-spacing:normal;font-size:0.85rem;color:rgba(255,255,255,0.3); }
 </style>
 
 <script>
-// ── Panel state machine ──────────────────────────────────────────────
-// Panels: 'setNew' | 'enableExisting' | 'disable' | 'change'
-// Each panel is a sequence of steps (each step = one keypad entry)
-
 let currentPanel = null;
-let steps = [];       // list of {title, subtitle, key} — key stored per step
+let steps = [];
 let stepIndex = 0;
-let stepValues = {};  // key → entered code
+let stepValues = {};
 
 function showPanel(panel) {
     currentPanel = panel;
     stepValues = {};
     if (panel === 'setNew') {
         steps = [
-            { title: 'Set New Passcode',    subtitle: 'Enter a 6-digit passcode', key: 'new' },
-            { title: 'Confirm Passcode',    subtitle: 'Re-enter to confirm',       key: 'confirm' },
+            { title: 'Set New Passcode',  subtitle: 'Enter a 6-digit passcode',      key: 'new' },
+            { title: 'Confirm Passcode',  subtitle: 'Re-enter to confirm',            key: 'confirm' },
         ];
     } else if (panel === 'enableExisting') {
         steps = [
-            { title: 'Enable Lock',  subtitle: 'Enter your passcode to enable', key: 'current' },
+            { title: 'Enable Lock',       subtitle: 'Enter your passcode to enable',  key: 'current' },
         ];
     } else if (panel === 'disable') {
         steps = [
-            { title: 'Disable Lock', subtitle: 'Enter your passcode to disable', key: 'current' },
+            { title: 'Disable Lock',      subtitle: 'Enter your passcode to disable', key: 'current' },
         ];
     } else if (panel === 'change') {
         steps = [
-            { title: 'Current Passcode', subtitle: 'Enter your current passcode', key: 'current' },
-            { title: 'New Passcode',      subtitle: 'Enter a new 6-digit passcode', key: 'new' },
-            { title: 'Confirm New',       subtitle: 'Re-enter the new passcode',    key: 'confirm' },
+            { title: 'Current Passcode',  subtitle: 'Enter your current passcode',    key: 'current' },
+            { title: 'New Passcode',      subtitle: 'Enter a new 6-digit passcode',   key: 'new' },
+            { title: 'Confirm New',       subtitle: 'Re-enter the new passcode',      key: 'confirm' },
         ];
     }
     stepIndex = 0;
@@ -163,31 +138,26 @@ function openStep() {
     document.getElementById('kpSubtitle').textContent = step.subtitle;
     document.getElementById('kpError').textContent = '';
     resetDots();
-    code = '';
+    const input = document.getElementById('kpInput');
+    input.value = '';
     document.getElementById('keypadOverlay').style.display = 'flex';
+    setTimeout(() => input.focus(), 50);
 }
 
 function closePanel() {
     document.getElementById('keypadOverlay').style.display = 'none';
-    code = '';
+    document.getElementById('kpInput').value = '';
 }
 
-// ── Keypad logic ─────────────────────────────────────────────────────
-const MAX_LEN = 6;
-let code = '';
-
-function updateDots() {
-    const dots = document.querySelectorAll('.kp-dot');
-    dots.forEach((d, i) => {
-        d.classList.toggle('filled', i < code.length);
+function updateDots(len) {
+    document.querySelectorAll('.kp-dot').forEach((d, i) => {
+        d.classList.toggle('filled', i < len);
         d.classList.remove('error');
     });
 }
 
 function resetDots() {
-    document.querySelectorAll('.kp-dot').forEach(d => {
-        d.classList.remove('filled', 'error');
-    });
+    document.querySelectorAll('.kp-dot').forEach(d => d.classList.remove('filled', 'error'));
 }
 
 function shakeAndClear(msg) {
@@ -198,31 +168,27 @@ function shakeAndClear(msg) {
     setTimeout(() => {
         dotsWrap.classList.remove('kp-shake');
         resetDots();
-        code = '';
+        const input = document.getElementById('kpInput');
+        input.value = '';
+        input.focus();
     }, 500);
 }
 
-async function onCodeComplete() {
+async function onCodeComplete(code) {
     const step = steps[stepIndex];
     stepValues[step.key] = code;
 
-    // Confirm step: check match
-    if (step.key === 'confirm') {
-        if (stepValues['confirm'] !== stepValues['new']) {
-            shakeAndClear('Passcodes do not match');
-            return;
-        }
+    if (step.key === 'confirm' && stepValues['confirm'] !== stepValues['new']) {
+        shakeAndClear('Passcodes do not match');
+        return;
     }
 
-    // If more steps, advance
     if (stepIndex < steps.length - 1) {
         stepIndex++;
-        code = '';
         openStep();
         return;
     }
 
-    // All steps done — call API
     closePanel();
     await submitAction();
 }
@@ -240,41 +206,25 @@ async function submitAction() {
     });
     const data = await resp.json();
     if (!resp.ok) {
-        // Re-open at the failed step with error
         showPanel(currentPanel);
         setTimeout(() => shakeAndClear(data.error || 'Error'), 50);
         return;
     }
-    // Reload to reflect new state
     location.reload();
 }
 
-document.querySelectorAll('.kp-key[data-n]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        if (code.length >= MAX_LEN) return;
-        code += btn.dataset.n;
-        updateDots();
-        if (code.length === MAX_LEN) setTimeout(onCodeComplete, 120);
-    });
-});
-
-document.getElementById('kpDel').addEventListener('click', () => {
-    code = code.slice(0, -1);
-    updateDots();
+document.getElementById('kpInput').addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '').slice(0, 6);
+    updateDots(this.value.length);
+    if (this.value.length === 6) {
+        const code = this.value;
+        setTimeout(() => onCodeComplete(code), 120);
+    }
 });
 
 document.addEventListener('keydown', e => {
-    if (!document.getElementById('keypadOverlay').style.display || document.getElementById('keypadOverlay').style.display === 'none') return;
-    if (e.key >= '0' && e.key <= '9' && code.length < MAX_LEN) {
-        code += e.key;
-        updateDots();
-        if (code.length === MAX_LEN) setTimeout(onCodeComplete, 120);
-    } else if (e.key === 'Backspace') {
-        code = code.slice(0, -1);
-        updateDots();
-    } else if (e.key === 'Escape') {
-        closePanel();
-    }
+    if (document.getElementById('keypadOverlay').style.display === 'none') return;
+    if (e.key === 'Escape') closePanel();
 });
 </script>
 {% endblock %}

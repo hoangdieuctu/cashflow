@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+{% block page_title %}Extra Fees{% endblock %}
+
+{% block content %}
+<style>
+.fee-card { transition: border-color 0.15s, box-shadow 0.15s; }
+.fee-card:hover { border-color: #CBD5E1 !important; box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+.fee-edit { display: none; }
+.entry-row td { vertical-align: middle; font-size: 0.82rem; }
+.entry-edit-row { display: none; background: #F8FAFC; }
+.add-entry-row td { background: #F8FAFC; padding: 0.5rem 0.75rem !important; }
+.progress-bar-wrap { height: 8px; background: #E2E8F0; border-radius: 99px; overflow: hidden; margin-bottom: 0.25rem; }
+.progress-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+.deadline-warn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; background: #FEF3C7; color: #D97706; border-radius: 6px; padding: 0.15rem 0.5rem; }
+.deadline-ok { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; background: #F1F5F9; color: #64748B; border-radius: 6px; padding: 0.15rem 0.5rem; }
+</style>
+
+{% set today = now_date %}
+
+<div class="row g-4">
+
+    <!-- Left: New Fee Tracker form -->
+    <div class="col-lg-4">
+        <div class="card" style="padding: 1.25rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 1rem;">
+                <i class="bi bi-plus-circle me-2" style="color: var(--tcb-red);"></i>New Fee Tracker
+            </h6>
+            <form id="addFeeForm">
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+                    <input type="text" class="form-control form-control-sm" id="feeName" placeholder="e.g. Insurance 2025" style="border-radius: 8px; border-color: #E2E8F0;" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statuses <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="text" class="form-control form-control-sm" id="feeStatuses" placeholder="Paid,Pending,Overdue" style="border-radius: 8px; border-color: #E2E8F0;">
+                    <div style="font-size: 0.72rem; color: #94A3B8; margin-top: 0.25rem;">Comma-separated list</div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Total Amount <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="number" class="form-control form-control-sm" id="feeTotalAmount" placeholder="e.g. 5000000" min="0" step="any" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Deadline <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="date" class="form-control form-control-sm" id="feeDeadline" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <button type="submit" class="btn btn-sm w-100" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.55rem;">
+                    <i class="bi bi-plus-circle me-1"></i>Add Tracker
+                </button>
+            </form>
+        </div>
+
+        {% if fees %}
+        <div class="card" style="padding: 1.25rem; margin-top: 1rem;">
+            <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 0.75rem; font-size: 0.85rem;">Summary</h6>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748B;">Trackers</span>
+                    <span style="font-weight: 600; color: var(--tcb-navy);">{{ fees | length }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748B;">Total paid</span>
+                    <span style="font-weight: 600; color: #059669;">{{ "{:,.0f}".format(fees | sum(attribute='paid_sum')) }}</span>
+                </div>
+                {% set total_budget = fees | selectattr('total_amount') | sum(attribute='total_amount') %}
+                {% if total_budget > 0 %}
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748B;">Total budget</span>
+                    <span style="font-weight: 600; color: var(--tcb-navy);">{{ "{:,.0f}".format(total_budget) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Tracker cards -->
+    <div class="col-lg-8">
+        {% if not fees %}
+        <div style="text-align: center; padding: 4rem 2rem; color: #94A3B8;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.4;"><i class="bi bi-receipt-cutoff"></i></div>
+            <h5 style="color: #64748B; font-weight: 700;">No fee trackers yet</h5>
+            <p style="font-size: 0.85rem;">Create a tracker to record recurring expenses like insurance, subscriptions, or utility bills.</p>
+        </div>
+        {% endif %}
+
+        {% for f in fees %}
+        {% set pct = ((f.paid_sum / f.total_amount) * 100) if f.total_amount else 0 %}
+        {% set bar_color = '#DC2626' if pct > 100 else ('#F59E0B' if pct > 80 else '#059669') %}
+        {% set days_left = ((f.deadline | todatetime) - (today | todatetime)).days if f.deadline else None %}
+        {% set deadline_warn = days_left is not none and days_left <= 31 %}
+        <div class="card fee-card" data-fee-id="{{ f.id }}" data-statuses="{{ f.statuses }}" style="margin-bottom: 1.25rem; padding: 0; {% if deadline_warn %}border-color: #FCD34D !important;{% endif %}">
+
+            <!-- View mode -->
+            <div class="fee-view" id="feeView{{ f.id }}" style="padding: 1.25rem;">
+                <!-- Header -->
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div style="flex: 1; min-width: 0;">
+                        <span style="font-weight: 700; font-size: 1rem; color: var(--tcb-navy);">{{ f.name }}</span>
+                    </div>
+                    {% if f.deadline %}
+                        {% if deadline_warn %}
+                        <span class="deadline-warn"><i class="bi bi-exclamation-triangle-fill"></i>
+                            {% if days_left <= 0 %}Overdue{% elif days_left == 0 %}Due today{% else %}{{ days_left }}d left{% endif %}
+                        </span>
+                        {% else %}
+                        <span class="deadline-ok"><i class="bi bi-calendar3"></i> {{ f.deadline }}</span>
+                        {% endif %}
+                    {% endif %}
+                    {% if f.total_amount %}
+                    <span style="font-size: 0.72rem; font-weight: 700; background: #EDE9FE; color: #7C3AED; border-radius: 6px; padding: 0.15rem 0.5rem; white-space: nowrap;">Budget: {{ "{:,.0f}".format(f.total_amount) }}</span>
+                    {% endif %}
+                    <button onclick="openFeeEdit({{ f.id }})" style="background: #F1F5F9; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #475569; cursor: pointer;" title="Edit"><i class="bi bi-pencil-fill" style="font-size: 0.8rem;"></i></button>
+                    <button onclick="deleteFee({{ f.id }}, this)" style="background: #FEF2F2; border: none; border-radius: 7px; padding: 0.3rem 0.55rem; color: #DC2626; cursor: pointer;" title="Delete"><i class="bi bi-trash-fill" style="font-size: 0.8rem;"></i></button>
+                </div>
+
+                <!-- Progress bar -->
+                {% if f.total_amount %}
+                <div style="margin-bottom: 0.75rem;">
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" style="width: {{ [pct, 100] | min }}%; background: {{ bar_color }};"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748B;">
+                        <span>{{ "{:,.0f}".format(f.paid_sum) }} paid</span>
+                        <span style="font-weight: 600; color: {{ bar_color }};">{{ pct | round(1) }}%</span>
+                        <span>{{ "{:,.0f}".format(f.total_amount - f.paid_sum) }} left</span>
+                    </div>
+                </div>
+                {% else %}
+                <div style="margin-bottom: 0.75rem;">
+                    <span style="font-size: 0.82rem; color: #64748B;">Total paid: </span>
+                    <span style="font-size: 0.82rem; font-weight: 700; color: #059669;">{{ "{:,.0f}".format(f.paid_sum) }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Status chips -->
+                {% if f.statuses_list %}
+                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem;">
+                    {% for s in f.statuses_list %}
+                    {% set sl = s | lower %}
+                    {% if 'paid' in sl %}
+                    <span style="font-size: 0.7rem; font-weight: 700; background: #D1FAE5; color: #059669; border-radius: 5px; padding: 0.12rem 0.45rem;">{{ s }}</span>
+                    {% elif 'overdue' in sl or 'late' in sl %}
+                    <span style="font-size: 0.7rem; font-weight: 700; background: #FEE2E2; color: #DC2626; border-radius: 5px; padding: 0.12rem 0.45rem;">{{ s }}</span>
+                    {% else %}
+                    <span style="font-size: 0.7rem; font-weight: 700; background: #F1F5F9; color: #475569; border-radius: 5px; padding: 0.12rem 0.45rem;">{{ s }}</span>
+                    {% endif %}
+                    {% endfor %}
+                    <span style="font-size: 0.7rem; color: #94A3B8; margin-left: 0.25rem; line-height: 1.8;">{{ f.entry_count }} entr{{ 'y' if f.entry_count == 1 else 'ies' }}</span>
+                </div>
+                {% else %}
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.7rem; color: #94A3B8;">{{ f.entry_count }} entr{{ 'y' if f.entry_count == 1 else 'ies' }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Entries table -->
+                <div style="border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden;">
+                    <table class="table table-sm mb-0" style="font-size: 0.82rem;">
+                        <thead>
+                            <tr style="background: #F8FAFC;">
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Date</th>
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Name</th>
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0; text-align: right;">Amount</th>
+                                {% if f.statuses_list %}<th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Status</th>{% endif %}
+                                <th style="padding: 0.5rem 0.75rem; font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #E2E8F0;">Note</th>
+                                <th style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #E2E8F0;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="entryBody{{ f.id }}">
+                            {% with entries = f.get('entries', []) %}
+                            {% for e in entries %}
+                            <tr class="entry-row" id="entryRow{{ e.id }}">
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; color: #475569;">{{ e.date }}</td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; color: var(--tcb-navy); font-weight: 600;">{{ e.name }}</td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; text-align: right; font-weight: 600; color: #DC2626;">{{ "{:,.0f}".format(e.amount) }}</td>
+                                {% if f.statuses_list %}
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9;">
+                                    {% if e.status %}
+                                    {% set sl = e.status | lower %}
+                                    {% if 'paid' in sl %}<span style="font-size:0.7rem;font-weight:700;background:#D1FAE5;color:#059669;border-radius:5px;padding:0.1rem 0.4rem;">{{ e.status }}</span>
+                                    {% elif 'overdue' in sl or 'late' in sl %}<span style="font-size:0.7rem;font-weight:700;background:#FEE2E2;color:#DC2626;border-radius:5px;padding:0.1rem 0.4rem;">{{ e.status }}</span>
+                                    {% else %}<span style="font-size:0.7rem;font-weight:700;background:#F1F5F9;color:#475569;border-radius:5px;padding:0.1rem 0.4rem;">{{ e.status }}</span>
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; color: #94A3B8; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.note or '' }}</td>
+                                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #F1F5F9; white-space: nowrap;">
+                                    <button onclick="openEntryEdit({{ f.id }}, {{ e.id }})" style="background:none;border:none;color:#64748B;cursor:pointer;padding:0.1rem 0.3rem;" title="Edit"><i class="bi bi-pencil-fill" style="font-size:0.75rem;"></i></button>
+                                    <button onclick="deleteEntry({{ f.id }}, {{ e.id }}, this)" style="background:none;border:none;color:#DC2626;cursor:pointer;padding:0.1rem 0.3rem;" title="Delete"><i class="bi bi-trash-fill" style="font-size:0.75rem;"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="entry-edit-row" id="entryEdit{{ e.id }}">
+                                <td colspan="{{ 6 if f.statuses_list else 5 }}" style="padding: 0.6rem 0.75rem; border-bottom: 1px solid #F1F5F9;">
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                                        <input type="date" id="eeDate{{ e.id }}" value="{{ e.date }}" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="text" id="eeName{{ e.id }}" value="{{ e.name }}" placeholder="Name" class="form-control form-control-sm" style="width: 140px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="number" id="eeAmount{{ e.id }}" value="{{ e.amount }}" placeholder="Amount" step="any" min="0" class="form-control form-control-sm" style="width: 110px; border-radius: 6px; font-size: 0.78rem;">
+                                        {% if f.statuses_list %}
+                                        <select id="eeStatus{{ e.id }}" class="form-select form-select-sm" style="width: 120px; border-radius: 6px; font-size: 0.78rem;">
+                                            {% for s in f.statuses_list %}
+                                            <option value="{{ s }}" {% if s == e.status %}selected{% endif %}>{{ s }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                        <input type="text" id="eeNote{{ e.id }}" value="{{ e.note or '' }}" placeholder="Note" class="form-control form-control-sm" style="width: 120px; border-radius: 6px; font-size: 0.78rem;">
+                                        <button onclick="saveEntryEdit({{ f.id }}, {{ e.id }}, this)" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;">Save</button>
+                                        <button onclick="cancelEntryEdit({{ e.id }})" class="btn btn-sm" style="background: #F1F5F9; color: #475569; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;">Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% endwith %}
+
+                            <!-- Add entry row -->
+                            <tr class="add-entry-row" id="addRow{{ f.id }}">
+                                <td colspan="{{ 6 if f.statuses_list else 5 }}">
+                                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                                        <input type="date" id="newDate{{ f.id }}" class="form-control form-control-sm" style="width: 130px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="text" id="newName{{ f.id }}" placeholder="Description" class="form-control form-control-sm" style="width: 140px; border-radius: 6px; font-size: 0.78rem;">
+                                        <input type="number" id="newAmount{{ f.id }}" placeholder="Amount" step="any" min="0" class="form-control form-control-sm" style="width: 110px; border-radius: 6px; font-size: 0.78rem;">
+                                        {% if f.statuses_list %}
+                                        <select id="newStatus{{ f.id }}" class="form-select form-select-sm" style="width: 120px; border-radius: 6px; font-size: 0.78rem;">
+                                            {% for s in f.statuses_list %}
+                                            <option value="{{ s }}">{{ s }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% endif %}
+                                        <input type="text" id="newNote{{ f.id }}" placeholder="Note (optional)" class="form-control form-control-sm" style="width: 120px; border-radius: 6px; font-size: 0.78rem;">
+                                        <button onclick="addEntry({{ f.id }}, {{ 'true' if f.statuses_list else 'false' }}, this)" class="btn btn-sm" style="background: #059669; color: #fff; border-radius: 6px; font-size: 0.78rem; padding: 0.25rem 0.6rem;"><i class="bi bi-plus"></i> Add</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Edit mode -->
+            <div class="fee-edit" id="feeEdit{{ f.id }}" style="padding: 1.25rem; background: #F8FAFC; border-radius: inherit;">
+                <h6 style="font-weight: 700; color: var(--tcb-navy); margin-bottom: 0.75rem; font-size: 0.88rem;">Edit Tracker</h6>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+                    <input type="text" id="editName{{ f.id }}" value="{{ f.name }}" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Statuses <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="text" id="editStatuses{{ f.id }}" value="{{ f.statuses }}" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                    <div style="font-size: 0.72rem; color: #94A3B8; margin-top: 0.2rem;">Comma-separated</div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Total Amount <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="number" id="editTotal{{ f.id }}" value="{{ f.total_amount or '' }}" step="any" min="0" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" style="font-size: 0.72rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Deadline <span style="font-weight:400;color:#94A3B8;">(optional)</span></label>
+                    <input type="date" id="editDeadline{{ f.id }}" value="{{ f.deadline or '' }}" class="form-control form-control-sm" style="border-radius: 8px; border-color: #E2E8F0;">
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="saveFeeEdit({{ f.id }}, this)" class="btn btn-sm" style="background: var(--tcb-navy); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.45rem 1rem;">Save</button>
+                    <button onclick="cancelFeeEdit({{ f.id }})" class="btn btn-sm" style="background: #F1F5F9; color: #475569; border-radius: 8px; font-weight: 700; padding: 0.45rem 1rem;">Cancel</button>
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fmt = n => new Intl.NumberFormat('vi-VN').format(Math.round(n));
+
+document.querySelectorAll('[id^="newDate"]').forEach(el => {
+    if (!el.value) el.value = new Date().toISOString().slice(0, 10);
+});
+
+document.getElementById('addFeeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('feeName').value.trim(),
+        statuses: document.getElementById('feeStatuses').value.trim(),
+    };
+    const ta = document.getElementById('feeTotalAmount').value;
+    if (ta) body.total_amount = parseFloat(ta);
+    const dl = document.getElementById('feeDeadline').value;
+    if (dl) body.deadline = dl;
+    const resp = await fetch('/api/extra-fees', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+});
+
+function openFeeEdit(id) {
+    document.getElementById('feeView' + id).style.display = 'none';
+    document.getElementById('feeEdit' + id).style.display = 'block';
+}
+function cancelFeeEdit(id) {
+    document.getElementById('feeEdit' + id).style.display = 'none';
+    document.getElementById('feeView' + id).style.display = 'block';
+}
+async function saveFeeEdit(id, btn) {
+    btn.disabled = true;
+    const body = {
+        name: document.getElementById('editName' + id).value.trim(),
+        statuses: document.getElementById('editStatuses' + id).value.trim(),
+        deadline: document.getElementById('editDeadline' + id).value || null,
+    };
+    const ta = document.getElementById('editTotal' + id).value;
+    body.total_amount = ta ? parseFloat(ta) : null;
+    const resp = await fetch('/api/extra-fees/' + id, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+async function deleteFee(id, btn) {
+    if (!confirm('Delete this fee tracker and all its entries?')) return;
+    btn.disabled = true;
+    const resp = await fetch('/api/extra-fees/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+async function addEntry(feeId, hasStatus, btn) {
+    btn.disabled = true;
+    const body = {
+        date: document.getElementById('newDate' + feeId).value,
+        name: document.getElementById('newName' + feeId).value.trim(),
+        amount: parseFloat(document.getElementById('newAmount' + feeId).value),
+        status: hasStatus ? document.getElementById('newStatus' + feeId).value : '',
+        note: document.getElementById('newNote' + feeId).value.trim(),
+    };
+    if (!body.date || !body.name || !body.amount) {
+        alert('Date, name and amount are required'); btn.disabled = false; return;
+    }
+    const resp = await fetch('/api/extra-fees/' + feeId + '/entries', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+
+function openEntryEdit(feeId, entryId) {
+    document.getElementById('entryRow' + entryId).style.display = 'none';
+    document.getElementById('entryEdit' + entryId).style.display = 'table-row';
+}
+function cancelEntryEdit(entryId) {
+    document.getElementById('entryEdit' + entryId).style.display = 'none';
+    document.getElementById('entryRow' + entryId).style.display = 'table-row';
+}
+async function saveEntryEdit(feeId, entryId, btn) {
+    btn.disabled = true;
+    const statusEl = document.getElementById('eeStatus' + entryId);
+    const body = {
+        date: document.getElementById('eeDate' + entryId).value,
+        name: document.getElementById('eeName' + entryId).value.trim(),
+        amount: parseFloat(document.getElementById('eeAmount' + entryId).value),
+        status: statusEl ? statusEl.value : '',
+        note: document.getElementById('eeNote' + entryId).value.trim(),
+    };
+    const resp = await fetch('/api/extra-fees/' + feeId + '/entries/' + entryId, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+async function deleteEntry(feeId, entryId, btn) {
+    if (!confirm('Delete this entry?')) return;
+    btn.disabled = true;
+    const resp = await fetch('/api/extra-fees/' + feeId + '/entries/' + entryId, { method: 'DELETE' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || 'Error'); btn.disabled = false; return; }
+    location.reload();
+}
+</script>
+{% endblock %}

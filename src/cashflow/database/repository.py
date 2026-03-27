@@ -1132,6 +1132,204 @@ class Repository:
             )
         self.conn.commit()
 
+    # ── Extra Fees ──
+
+    def _enrich_fee(self, row: dict) -> dict:
+        row = dict(row)
+        row["statuses_list"] = [s.strip() for s in row["statuses"].split(",") if s.strip()]
+        return row
+
+    def get_extra_fees(self) -> list[dict]:
+        rows = self.conn.execute("""
+            SELECT f.*, COUNT(e.id) AS entry_count, COALESCE(SUM(e.amount), 0) AS paid_sum
+            FROM extra_fees f
+            LEFT JOIN extra_fee_entries e ON e.fee_id = f.id
+            GROUP BY f.id
+            ORDER BY f.name
+        """).fetchall()
+        return [self._enrich_fee(r) for r in rows]
+
+    def get_extra_fee(self, fee_id: int) -> dict | None:
+        row = self.conn.execute("""
+            SELECT f.*, COUNT(e.id) AS entry_count, COALESCE(SUM(e.amount), 0) AS paid_sum
+            FROM extra_fees f
+            LEFT JOIN extra_fee_entries e ON e.fee_id = f.id
+            WHERE f.id = ?
+            GROUP BY f.id
+        """, (fee_id,)).fetchone()
+        return self._enrich_fee(row) if row else None
+
+    def add_extra_fee(self, name: str, statuses: str, total_amount: float | None,
+                      deadline: str | None = None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO extra_fees (name, statuses, total_amount, deadline) VALUES (?, ?, ?, ?)",
+            (name.strip(), statuses.strip(), total_amount, deadline),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_extra_fee(self, fee_id: int, name: str | None = None,
+                         statuses: str | None = None, total_amount=False,
+                         deadline=False) -> bool:
+        fields, params = [], []
+        if name is not None:
+            fields.append("name = ?"); params.append(name.strip())
+        if statuses is not None:
+            fields.append("statuses = ?"); params.append(statuses.strip())
+        if total_amount is not False:
+            fields.append("total_amount = ?"); params.append(total_amount)
+        if deadline is not False:
+            fields.append("deadline = ?"); params.append(deadline)
+        if not fields:
+            return False
+        params.append(fee_id)
+        cur = self.conn.execute(
+            f"UPDATE extra_fees SET {', '.join(fields)} WHERE id = ?", params
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_extra_fee(self, fee_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM extra_fees WHERE id = ?", (fee_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_extra_fee_entries(self, fee_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM extra_fee_entries WHERE fee_id = ? ORDER BY date DESC, created_at DESC",
+            (fee_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_extra_fee_entry(self, fee_id: int, date: str, amount: float,
+                            name: str, note: str = "", status: str = "") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO extra_fee_entries (fee_id, date, amount, name, note, status) VALUES (?, ?, ?, ?, ?, ?)",
+            (fee_id, date, amount, name.strip(), note.strip(), status.strip()),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_extra_fee_entry(self, entry_id: int, date: str | None = None,
+                               amount: float | None = None, name: str | None = None,
+                               note: str | None = None, status: str | None = None) -> bool:
+        fields, params = [], []
+        if date is not None:
+            fields.append("date = ?"); params.append(date)
+        if amount is not None:
+            fields.append("amount = ?"); params.append(amount)
+        if name is not None:
+            fields.append("name = ?"); params.append(name.strip())
+        if note is not None:
+            fields.append("note = ?"); params.append(note.strip())
+        if status is not None:
+            fields.append("status = ?"); params.append(status.strip())
+        if not fields:
+            return False
+        params.append(entry_id)
+        cur = self.conn.execute(
+            f"UPDATE extra_fee_entries SET {', '.join(fields)} WHERE id = ?", params
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_extra_fee_entry(self, entry_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM extra_fee_entries WHERE id = ?", (entry_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # ── Investments ──
+
+    def get_investments(self) -> list[dict]:
+        rows = self.conn.execute("""
+            SELECT i.*, COUNT(x.id) AS item_count, COALESCE(SUM(x.amount), 0) AS total_invested
+            FROM investments i
+            LEFT JOIN investment_items x ON x.investment_id = i.id
+            GROUP BY i.id
+            ORDER BY i.name
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_investment(self, investment_id: int) -> dict | None:
+        row = self.conn.execute("""
+            SELECT i.*, COUNT(x.id) AS item_count, COALESCE(SUM(x.amount), 0) AS total_invested
+            FROM investments i
+            LEFT JOIN investment_items x ON x.investment_id = i.id
+            WHERE i.id = ?
+            GROUP BY i.id
+        """, (investment_id,)).fetchone()
+        return dict(row) if row else None
+
+    def add_investment(self, name: str, description: str = "", unit: str = "VND") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO investments (name, description, unit) VALUES (?, ?, ?)",
+            (name.strip(), description.strip(), unit.strip() or "VND"),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_investment(self, investment_id: int, name: str | None = None,
+                          description: str | None = None, unit: str | None = None) -> bool:
+        fields, params = [], []
+        if name is not None:
+            fields.append("name = ?"); params.append(name.strip())
+        if description is not None:
+            fields.append("description = ?"); params.append(description.strip())
+        if unit is not None:
+            fields.append("unit = ?"); params.append(unit.strip() or "VND")
+        if not fields:
+            return False
+        params.append(investment_id)
+        cur = self.conn.execute(
+            f"UPDATE investments SET {', '.join(fields)} WHERE id = ?", params
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_investment(self, investment_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM investments WHERE id = ?", (investment_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_investment_items(self, investment_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM investment_items WHERE investment_id = ? ORDER BY date DESC, created_at DESC",
+            (investment_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_investment_item(self, investment_id: int, date: str, amount: float,
+                            note: str = "") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO investment_items (investment_id, date, amount, note) VALUES (?, ?, ?, ?)",
+            (investment_id, date, amount, note.strip()),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def update_investment_item(self, item_id: int, date: str | None = None,
+                               amount: float | None = None, note: str | None = None) -> bool:
+        fields, params = [], []
+        if date is not None:
+            fields.append("date = ?"); params.append(date)
+        if amount is not None:
+            fields.append("amount = ?"); params.append(amount)
+        if note is not None:
+            fields.append("note = ?"); params.append(note.strip())
+        if not fields:
+            return False
+        params.append(item_id)
+        cur = self.conn.execute(
+            f"UPDATE investment_items SET {', '.join(fields)} WHERE id = ?", params
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_investment_item(self, item_id: int) -> bool:
+        cur = self.conn.execute("DELETE FROM investment_items WHERE id = ?", (item_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
 
 def _date_str(d: date | None) -> str | None:
     return d.isoformat() if d else None
