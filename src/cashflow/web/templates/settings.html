@@ -88,7 +88,7 @@
 
     </div>
     <div class="col-lg-5 col-md-7">
-        <div class="card mt-4">
+        <div class="card">
             <div class="card-header-custom">
                 <h6><i class="bi bi-envelope-arrow-up-fill me-2" style="color:#2563EB;"></i>Database Backup</h6>
             </div>
@@ -109,14 +109,14 @@
                 <div class="mb-2">
                     <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">SMTP Password <span style="font-weight:400;text-transform:none;letter-spacing:0;">(leave blank to keep existing)</span></label>
                     <input type="password" id="smtpPass" placeholder="App password" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
-                    <div style="font-size:0.72rem;color:#94A3B8;margin-top:0.25rem;"><i class="bi bi-info-circle me-1"></i>Gmail: use an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#2563EB;">App Password</a>, not your regular password.</div>
+
                 </div>
                 <div class="mb-3">
                     <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">Recipient Email</label>
                     <input type="text" id="backupRecipient" value="{{ backup_email_config.recipient }}" placeholder="recipient@email.com" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
                 </div>
-                <hr style="border-color:#F1F5F9;margin:1rem 0;">
-                <div class="mb-2">
+                <hr style="border-color:#F1F5F9;margin:0.5rem 0;">
+                <div style="margin-top:0.4rem;">
                     <div class="form-check" style="display:flex;align-items:center;gap:0.5rem;">
                         <input class="form-check-input" type="checkbox" id="scheduleEnabled" {% if backup_email_config.schedule_enabled %}checked{% endif %} onchange="toggleSchedule()" style="width:1.1rem;height:1.1rem;border-radius:5px;cursor:pointer;">
                         <label class="form-check-label" for="scheduleEnabled" style="font-size:0.82rem;font-weight:600;color:var(--tcb-navy);cursor:pointer;">Send backup daily</label>
