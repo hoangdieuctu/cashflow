@@ -53,7 +53,107 @@ def settings():
     with _get_repo() as repo:
         enabled = repo.get_setting("passcode_enabled") == "1"
         has_passcode = repo.get_setting("passcode_hash") is not None
-    return render_template("settings.html", passcode_enabled=enabled, has_passcode=has_passcode)
+        backup_email_config = {
+            "smtp_host": repo.get_setting("backup_smtp_host") or "",
+            "smtp_port": repo.get_setting("backup_smtp_port") or "465",
+            "smtp_user": repo.get_setting("backup_smtp_user") or "",
+            "recipient": repo.get_setting("backup_recipient") or "",
+        }
+    return render_template("settings.html", passcode_enabled=enabled, has_passcode=has_passcode, backup_email_config=backup_email_config)
+
+
+@bp.route("/api/settings/backup-email", methods=["POST"])
+def save_backup_email_config():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    smtp_host = (data.get("smtp_host") or "").strip()
+    smtp_port = (data.get("smtp_port") or "587").strip()
+    smtp_user = (data.get("smtp_user") or "").strip()
+    smtp_pass = (data.get("smtp_pass") or "").strip()
+    recipient = (data.get("recipient") or "").strip()
+    if not smtp_host or not smtp_user or not recipient:
+        return jsonify({"error": "SMTP host, username, and recipient are required"}), 400
+    try:
+        int(smtp_port)
+    except ValueError:
+        return jsonify({"error": "SMTP port must be a number"}), 400
+    with _get_repo() as repo:
+        repo.set_setting("backup_smtp_host", smtp_host)
+        repo.set_setting("backup_smtp_port", smtp_port)
+        repo.set_setting("backup_smtp_user", smtp_user)
+        if smtp_pass:
+            repo.set_setting("backup_smtp_pass", smtp_pass)
+        repo.set_setting("backup_recipient", recipient)
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/backup/send", methods=["POST"])
+def send_backup():
+    import shutil
+    import smtplib
+    import tempfile
+    from datetime import date
+    from email import encoders
+    from email.mime.base import MIMEBase
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    from cashflow import __version__
+    from cashflow.config import DATABASE_PATH
+
+    with _get_repo() as repo:
+        smtp_host = repo.get_setting("backup_smtp_host")
+        smtp_port = int(repo.get_setting("backup_smtp_port") or 587)
+        smtp_user = repo.get_setting("backup_smtp_user")
+        smtp_pass = repo.get_setting("backup_smtp_pass")
+        recipient = repo.get_setting("backup_recipient")
+
+    if not smtp_host or not smtp_user or not recipient:
+        return jsonify({"error": "Email backup is not configured. Please save SMTP settings first."}), 400
+
+    filename = f"cashflow-{__version__}-{date.today().strftime('%Y%m%d')}.db"
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_path = tmp.name
+        shutil.copy2(str(DATABASE_PATH), tmp_path)
+
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = recipient
+        msg["Subject"] = f"Cashflow DB Backup — {date.today().strftime('%Y-%m-%d')}"
+        msg.attach(MIMEText(f"Attached: {filename}\nVersion: {__version__}", "plain"))
+
+        with open(tmp_path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+        msg.attach(part)
+
+        if smtp_port == 465:
+            import ssl
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as server:
+                server.login(smtp_user, smtp_pass or "")
+                server.sendmail(smtp_user, recipient, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass or "")
+                server.sendmail(smtp_user, recipient, msg.as_string())
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        import os
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+    return jsonify({"ok": True, "filename": filename})
 
 
 @bp.route("/api/settings/passcode", methods=["POST"])

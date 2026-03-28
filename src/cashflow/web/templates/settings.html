@@ -38,6 +38,46 @@
             </div>
         </div>
 
+        <!-- Database Backup -->
+        <div class="card mb-4">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-envelope-arrow-up-fill me-2" style="color:#2563EB;"></i>Database Backup</h6>
+            </div>
+            <div style="padding:1.25rem;">
+                <p style="font-size:0.82rem;color:#64748B;margin-bottom:1rem;">Send a backup of the database to your email as an attachment.</p>
+                <div class="mb-2">
+                    <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">SMTP Host</label>
+                    <input type="text" id="smtpHost" value="{{ backup_email_config.smtp_host }}" placeholder="e.g. smtp.gmail.com" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
+                </div>
+                <div class="mb-2">
+                    <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">SMTP Port</label>
+                    <input type="number" id="smtpPort" value="{{ backup_email_config.smtp_port }}" placeholder="587" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;width:100px;">
+                </div>
+                <div class="mb-2">
+                    <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">SMTP Username</label>
+                    <input type="text" id="smtpUser" value="{{ backup_email_config.smtp_user }}" placeholder="your@email.com" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
+                </div>
+                <div class="mb-2">
+                    <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">SMTP Password <span style="font-weight:400;text-transform:none;letter-spacing:0;">(leave blank to keep existing)</span></label>
+                    <input type="password" id="smtpPass" placeholder="App password" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
+                    <div style="font-size:0.72rem;color:#94A3B8;margin-top:0.25rem;"><i class="bi bi-info-circle me-1"></i>Gmail: use an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#2563EB;">App Password</a>, not your regular password.</div>
+                </div>
+                <div class="mb-3">
+                    <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">Recipient Email</label>
+                    <input type="text" id="backupRecipient" value="{{ backup_email_config.recipient }}" placeholder="recipient@email.com" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <button onclick="saveBackupConfig(this)" class="btn btn-sm" style="background:#334155;color:#fff;border-radius:8px;font-weight:700;padding:0.45rem 1rem;">
+                        <i class="bi bi-floppy-fill me-1"></i>Save Config
+                    </button>
+                    <button onclick="sendBackup(this)" class="btn btn-sm" style="background:#2563EB;color:#fff;border-radius:8px;font-weight:700;padding:0.45rem 1rem;">
+                        <i class="bi bi-envelope-arrow-up me-1"></i>Send Backup Now
+                    </button>
+                </div>
+                <div id="backupMsg" style="margin-top:0.75rem;font-size:0.82rem;display:none;"></div>
+            </div>
+        </div>
+
     </div>
     <div class="col-lg-5 col-md-7">
         <div class="card">
@@ -359,5 +399,53 @@ document.getElementById('newConvUnit').addEventListener('input', function() {
 });
 
 loadConverters();
+
+async function saveBackupConfig(btn) {
+    btn.disabled = true;
+    const body = {
+        smtp_host: document.getElementById('smtpHost').value.trim(),
+        smtp_port: document.getElementById('smtpPort').value.trim(),
+        smtp_user: document.getElementById('smtpUser').value.trim(),
+        smtp_pass: document.getElementById('smtpPass').value,
+        recipient: document.getElementById('backupRecipient').value.trim(),
+    };
+    const resp = await fetch('/api/settings/backup-email', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    btn.disabled = false;
+    const msg = document.getElementById('backupMsg');
+    if (!resp.ok) {
+        msg.style.display = 'block';
+        msg.style.color = '#DC2626';
+        msg.textContent = data.error || 'Error saving config';
+    } else {
+        msg.style.display = 'block';
+        msg.style.color = '#059669';
+        msg.textContent = 'Config saved.';
+        document.getElementById('smtpPass').value = '';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+}
+
+async function sendBackup(btn) {
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Sending…';
+    const msg = document.getElementById('backupMsg');
+    msg.style.display = 'none';
+    const resp = await fetch('/api/backup/send', { method: 'POST' });
+    const data = await resp.json();
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    msg.style.display = 'block';
+    if (!resp.ok) {
+        msg.style.color = '#DC2626';
+        msg.textContent = data.error || 'Failed to send backup';
+    } else {
+        msg.style.color = '#059669';
+        msg.textContent = `Backup sent: ${data.filename}`;
+    }
+}
 </script>
 {% endblock %}
