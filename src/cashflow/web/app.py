@@ -24,6 +24,8 @@ def create_app(db_path: str | None = None) -> Flask:
     from cashflow.web.routes import bp
     app.register_blueprint(bp)
 
+    _start_backup_scheduler(app)
+
     from datetime import datetime, timezone
 
     @app.before_request
@@ -138,3 +140,99 @@ def create_app(db_path: str | None = None) -> Flask:
             return date.today()
 
     return app
+
+
+def _start_backup_scheduler(app: Flask) -> None:
+    """Start a background thread that sends a daily DB backup at the configured time."""
+    import threading
+    import time
+
+    def _run():
+        last_sent_date = None
+        while True:
+            time.sleep(30)
+            try:
+                from cashflow.database.repository import Repository
+                with Repository(app.config["DB_PATH"]) as repo:
+                    enabled = repo.get_setting("backup_schedule_enabled") == "1"
+                    hour = int(repo.get_setting("backup_schedule_hour") or 8)
+                    minute = int(repo.get_setting("backup_schedule_minute") or 0)
+                if not enabled:
+                    continue
+                from datetime import datetime
+                now = datetime.now()
+                today = now.date()
+                if now.hour == hour and now.minute == minute and last_sent_date != today:
+                    with app.app_context():
+                        _send_backup_email(app)
+                    last_sent_date = today
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+
+def _send_backup_email(app: Flask) -> None:
+    """Send backup email — shared logic used by scheduler and API route."""
+    import shutil
+    import smtplib
+    import tempfile
+    import os
+    from datetime import date
+    from email import encoders
+    from email.mime.base import MIMEBase
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    from cashflow import __version__
+
+    with app.app_context():
+        from cashflow.database.repository import Repository
+        with Repository(app.config["DB_PATH"]) as repo:
+            smtp_host = repo.get_setting("backup_smtp_host")
+            smtp_port = int(repo.get_setting("backup_smtp_port") or 465)
+            smtp_user = repo.get_setting("backup_smtp_user")
+            smtp_pass = repo.get_setting("backup_smtp_pass")
+            recipient = repo.get_setting("backup_recipient")
+
+    if not smtp_host or not smtp_user or not recipient:
+        raise ValueError("Email backup is not configured")
+
+    filename = f"cashflow-{__version__}-{date.today().strftime('%Y%m%d')}.db"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            tmp_path = tmp.name
+        shutil.copy2(app.config["DB_PATH"], tmp_path)
+
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = recipient
+        msg["Subject"] = f"Cashflow DB Backup — {date.today().strftime('%Y-%m-%d')}"
+        msg.attach(MIMEText(f"Attached: {filename}\nVersion: {__version__}", "plain"))
+
+        with open(tmp_path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+        msg.attach(part)
+
+        if smtp_port == 465:
+            import ssl
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as server:
+                server.login(smtp_user, smtp_pass or "")
+                server.sendmail(smtp_user, recipient, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass or "")
+                server.sendmail(smtp_user, recipient, msg.as_string())
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass

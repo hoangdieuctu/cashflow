@@ -115,6 +115,38 @@
                     <label style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.25rem;">Recipient Email</label>
                     <input type="text" id="backupRecipient" value="{{ backup_email_config.recipient }}" placeholder="recipient@email.com" class="form-control form-control-sm" style="border-radius:8px;border-color:#E2E8F0;">
                 </div>
+                <hr style="border-color:#F1F5F9;margin:1rem 0;">
+                <div class="mb-2">
+                    <div class="form-check" style="display:flex;align-items:center;gap:0.5rem;">
+                        <input class="form-check-input" type="checkbox" id="scheduleEnabled" {% if backup_email_config.schedule_enabled %}checked{% endif %} onchange="toggleSchedule()" style="width:1.1rem;height:1.1rem;border-radius:5px;cursor:pointer;">
+                        <label class="form-check-label" for="scheduleEnabled" style="font-size:0.82rem;font-weight:600;color:var(--tcb-navy);cursor:pointer;">Send backup daily</label>
+                    </div>
+                </div>
+                <div id="scheduleTimeRow" style="display:{% if backup_email_config.schedule_enabled %}flex{% else %}none{% endif %};gap:0.5rem;align-items:center;margin-top:0.5rem;">
+                    <div>
+                        <label style="font-size:0.7rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.2rem;">Hour</label>
+                        <select id="scheduleHour" class="form-select form-select-sm" style="width:75px;border-radius:8px;border-color:#E2E8F0;font-size:0.82rem;">
+                            {% for h in range(24) %}
+                            <option value="{{ h }}" {% if backup_email_config.schedule_hour|int == h %}selected{% endif %}>{{ "%02d"|format(h) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="font-weight:700;color:#64748B;margin-top:1.1rem;">:</div>
+                    <div>
+                        <label style="font-size:0.7rem;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.2rem;">Minute</label>
+                        <select id="scheduleMinute" class="form-select form-select-sm" style="width:75px;border-radius:8px;border-color:#E2E8F0;font-size:0.82rem;">
+                            {% for m in range(60) %}
+                            <option value="{{ m }}" {% if backup_email_config.schedule_minute|int == m %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="margin-top:1.1rem;">
+                        <button onclick="saveSchedule(this)" class="btn btn-sm" style="background:#059669;color:#fff;border-radius:8px;font-weight:700;padding:0.35rem 0.75rem;">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <hr style="border-color:#F1F5F9;margin:1rem 0;">
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                     <button onclick="saveBackupConfig(this)" class="btn btn-sm" style="background:#334155;color:#fff;border-radius:8px;font-weight:700;padding:0.45rem 1rem;">
                         <i class="bi bi-floppy-fill me-1"></i>Save Config
@@ -446,6 +478,40 @@ async function sendBackup(btn) {
     } else {
         msg.style.color = '#059669';
         msg.textContent = `Backup sent: ${data.filename}`;
+    }
+}
+
+async function saveSchedule(btn) {
+    btn.disabled = true;
+    const enabled = document.getElementById('scheduleEnabled').checked;
+    const hour = parseInt(document.getElementById('scheduleHour').value);
+    const minute = parseInt(document.getElementById('scheduleMinute').value);
+    const resp = await fetch('/api/settings/backup-schedule', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ enabled, hour, minute })
+    });
+    const data = await resp.json();
+    btn.disabled = false;
+    const msg = document.getElementById('backupMsg');
+    msg.style.display = 'block';
+    if (!resp.ok) {
+        msg.style.color = '#DC2626';
+        msg.textContent = data.error || 'Error saving schedule';
+    } else {
+        msg.style.color = '#059669';
+        msg.textContent = `Schedule saved: daily at ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+}
+
+function toggleSchedule() {
+    const enabled = document.getElementById('scheduleEnabled').checked;
+    document.getElementById('scheduleTimeRow').style.display = enabled ? 'flex' : 'none';
+    if (!enabled) {
+        fetch('/api/settings/backup-schedule', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ enabled: false, hour: parseInt(document.getElementById('scheduleHour').value), minute: parseInt(document.getElementById('scheduleMinute').value) })
+        });
     }
 }
 </script>

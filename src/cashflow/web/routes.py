@@ -58,6 +58,9 @@ def settings():
             "smtp_port": repo.get_setting("backup_smtp_port") or "465",
             "smtp_user": repo.get_setting("backup_smtp_user") or "",
             "recipient": repo.get_setting("backup_recipient") or "",
+            "schedule_enabled": repo.get_setting("backup_schedule_enabled") == "1",
+            "schedule_hour": repo.get_setting("backup_schedule_hour") or "8",
+            "schedule_minute": repo.get_setting("backup_schedule_minute") or "0",
         }
     return render_template("settings.html", passcode_enabled=enabled, has_passcode=has_passcode, backup_email_config=backup_email_config)
 
@@ -88,70 +91,38 @@ def save_backup_email_config():
     return jsonify({"ok": True})
 
 
+@bp.route("/api/settings/backup-schedule", methods=["POST"])
+def save_backup_schedule():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    schedule_enabled = "1" if data.get("enabled") else "0"
+    hour = data.get("hour", 8)
+    minute = data.get("minute", 0)
+    try:
+        hour = int(hour)
+        minute = int(minute)
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "hour must be 0–23 and minute 0–59"}), 400
+    with _get_repo() as repo:
+        repo.set_setting("backup_schedule_enabled", schedule_enabled)
+        repo.set_setting("backup_schedule_hour", str(hour))
+        repo.set_setting("backup_schedule_minute", str(minute))
+    return jsonify({"ok": True})
+
+
 @bp.route("/api/backup/send", methods=["POST"])
 def send_backup():
-    import shutil
-    import smtplib
-    import tempfile
-    from datetime import date
-    from email import encoders
-    from email.mime.base import MIMEBase
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-
-    from cashflow import __version__
-
-    with _get_repo() as repo:
-        smtp_host = repo.get_setting("backup_smtp_host")
-        smtp_port = int(repo.get_setting("backup_smtp_port") or 587)
-        smtp_user = repo.get_setting("backup_smtp_user")
-        smtp_pass = repo.get_setting("backup_smtp_pass")
-        recipient = repo.get_setting("backup_recipient")
-
-    if not smtp_host or not smtp_user or not recipient:
-        return jsonify({"error": "Email backup is not configured. Please save SMTP settings first."}), 400
-
-    filename = f"cashflow-{__version__}-{date.today().strftime('%Y%m%d')}.db"
-
+    from cashflow.web.app import _send_backup_email
     try:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-            tmp_path = tmp.name
-        shutil.copy2(current_app.config["DB_PATH"], tmp_path)
-
-        msg = MIMEMultipart()
-        msg["From"] = smtp_user
-        msg["To"] = recipient
-        msg["Subject"] = f"Cashflow DB Backup — {date.today().strftime('%Y-%m-%d')}"
-        msg.attach(MIMEText(f"Attached: {filename}\nVersion: {__version__}", "plain"))
-
-        with open(tmp_path, "rb") as f:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
-        msg.attach(part)
-
-        if smtp_port == 465:
-            import ssl
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as server:
-                server.login(smtp_user, smtp_pass or "")
-                server.sendmail(smtp_user, recipient, msg.as_string())
-        else:
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_pass or "")
-                server.sendmail(smtp_user, recipient, msg.as_string())
-
+        _send_backup_email(current_app._get_current_object())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        import os
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
+    from cashflow import __version__
+    from datetime import date
+    filename = f"cashflow-{__version__}-{date.today().strftime('%Y%m%d')}.db"
     return jsonify({"ok": True, "filename": filename})
 
 
