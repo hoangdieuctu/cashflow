@@ -1157,6 +1157,7 @@ def portfolios():
         assets_list = repo.get_assets()
         investments_list = repo.get_investments()
         savings_list = repo.get_savings()
+        pays_list = repo.get_pays()
         raw = repo.get_setting("unit_converters")
     converters = json.loads(raw) if raw else {}
     return render_template(
@@ -1164,5 +1165,6 @@ def portfolios():
         assets=assets_list,
         investments=investments_list,
         savings=savings_list,
+        pays=pays_list,
         converters=converters,
     )

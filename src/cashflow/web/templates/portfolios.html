@@ -10,7 +10,7 @@
     investments_vnd=0,
     investments_unconverted=false,
     savings_vnd=0,
-    pays_unpaid_vnd=0
+    pays_paid_vnd=0
 ) %}
 
 {% for a in assets %}
@@ -40,14 +40,10 @@
 {% endfor %}
 
 {% for p in pays %}
-    {% for item in p.entries %}
-        {% if not item.paid %}
-            {% set ns.pays_unpaid_vnd = ns.pays_unpaid_vnd + item.amount %}
-        {% endif %}
-    {% endfor %}
+    {% set ns.pays_paid_vnd = ns.pays_paid_vnd + p.paid_amount %}
 {% endfor %}
 
-{% set net_worth = ns.assets_vnd + ns.investments_vnd + ns.savings_vnd %}
+{% set net_worth = ns.assets_vnd + ns.investments_vnd + ns.savings_vnd + ns.pays_paid_vnd %}
 
 {# ── Net Worth Hero ── #}
 <div class="row g-3 mb-4">
@@ -73,6 +69,12 @@
                     <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Savings</div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: #FDE68A;">+{{ "{:,.0f}".format(ns.savings_vnd) }}</div>
                 </div>
+                {% if ns.pays_paid_vnd > 0 %}
+                <div style="text-align: center;">
+                    <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Pays (Paid)</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: #6EE7B7;">+{{ "{:,.0f}".format(ns.pays_paid_vnd) }}</div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -185,6 +187,38 @@
                 <div style="display:flex;justify-content:space-between;padding:0.6rem 1.25rem;background:#F8FAFC;">
                     <span style="font-size:0.78rem;font-weight:700;color:#64748B;">Total principal (VND)</span>
                     <span style="font-size:0.85rem;font-weight:800;color:#D97706;">{{ "{:,.0f}".format(ns.savings_vnd) }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {# ── Pays (Paid) ── #}
+    <div class="col-lg-6">
+        <div class="card" style="height: 100%;">
+            <div class="card-header-custom">
+                <h6><i class="bi bi-check2-circle me-2" style="color:#059669;"></i>Pays (Paid)</h6>
+                <a href="{{ url_for('main.pays') }}" style="font-size:0.75rem;color:#64748B;text-decoration:none;font-weight:600;">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div style="padding: 0.75rem 0;">
+                {% if not pays %}
+                <div style="text-align:center;color:#94A3B8;padding:1.5rem;font-size:0.85rem;">No pays defined</div>
+                {% else %}
+                {% for p in pays %}
+                {% if p.paid_amount > 0 %}
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 1.25rem;border-bottom:1px solid #F8FAFC;">
+                    <div>
+                        <span style="font-weight:600;font-size:0.85rem;color:var(--tcb-navy);">{{ p.name }}</span>
+                        {% if p.description %}<span style="font-size:0.75rem;color:#94A3B8;margin-left:0.4rem;">{{ p.description }}</span>{% endif %}
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;font-size:0.85rem;color:#059669;">{{ "{:,.0f}".format(p.paid_amount) }} <span style="font-size:0.7rem;color:#94A3B8;">VND</span></div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+                <div style="display:flex;justify-content:space-between;padding:0.6rem 1.25rem;background:#F8FAFC;">
+                    <span style="font-size:0.78rem;font-weight:700;color:#64748B;">Total Paid (VND)</span>
+                    <span style="font-size:0.85rem;font-weight:800;color:#059669;">{{ "{:,.0f}".format(ns.pays_paid_vnd) }}</span>
                 </div>
                 {% endif %}
             </div>
