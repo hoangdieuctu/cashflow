@@ -100,7 +100,6 @@ def send_backup():
     from email.mime.text import MIMEText
 
     from cashflow import __version__
-    from cashflow.config import DATABASE_PATH
 
     with _get_repo() as repo:
         smtp_host = repo.get_setting("backup_smtp_host")
@@ -117,7 +116,7 @@ def send_backup():
     try:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             tmp_path = tmp.name
-        shutil.copy2(str(DATABASE_PATH), tmp_path)
+        shutil.copy2(current_app.config["DB_PATH"], tmp_path)
 
         msg = MIMEMultipart()
         msg["From"] = smtp_user

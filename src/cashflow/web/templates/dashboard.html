@@ -1,5 +1,9 @@
 {% extends "base.html" %}
-{% block topbar_right %}{% endblock %}
+{% block topbar_right %}
+<a href="{{ url_for('main.upload') }}" class="btn btn-sm" style="background: linear-gradient(135deg, var(--tcb-red), #FF4D6D); color: #fff; border-radius: 8px; font-weight: 700; padding: 0.45rem 1rem; text-decoration: none;">
+    <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload
+</a>
+{% endblock %}
 
 {% block content %}
 {% if not has_any_statements %}
