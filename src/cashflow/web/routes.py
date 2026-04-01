@@ -380,6 +380,7 @@ def upload():
             )
             if result.warnings:
                 for w in result.warnings:
+                    current_app.logger.warning("Parse warning [%s]: %s", file.filename, w)
                     flash(w, "warning")
             any_success = True
 

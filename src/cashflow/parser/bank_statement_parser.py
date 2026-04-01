@@ -39,7 +39,7 @@ _Y_BALANCE_CENTER = 19
 _Y_TOLERANCE = 20
 
 # Patterns
-DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 DATE_TIME_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}\s+\d{2}:\d{2}:\d{2}$")
 REF_RE = re.compile(r"^FT[A-Z0-9\\]+$", re.IGNORECASE)
 PAGE_NO_RE = re.compile(r"^\d+/\d+$")
