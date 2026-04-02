@@ -39,11 +39,14 @@ _Y_BALANCE_CENTER = 19
 _Y_TOLERANCE = 20
 
 # Patterns
-DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+DATE_RE = re.compile(r"^(?:0?[1-9]|[12]\d|3[01])/(?:0?[1-9]|1[0-2])/\d{4}$")
 DATE_TIME_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}\s+\d{2}:\d{2}:\d{2}$")
 REF_RE = re.compile(r"^FT[A-Z0-9\\]+$", re.IGNORECASE)
 PAGE_NO_RE = re.compile(r"^\d+/\d+$")
 AMOUNT_RE = re.compile(r"^[\d,]+$")
+# VND amount: comma-grouped (e.g. 10,800,000) or small plain number (≤9 digits, e.g. 826).
+# Excludes long reference-number strings like 14604150494929.
+AMOUNT_VND_RE = re.compile(r"^(?:\d{1,3}(?:,\d{3})+|\d{1,9})$")
 
 
 def _col(y: float) -> str | None:
@@ -149,67 +152,81 @@ def _parse_transactions(
 ) -> tuple[list[Transaction], list[str]]:
     """Parse transactions from text lines using spatial amounts for debit/credit.
 
-    Matches each transaction's line block to its spatial amount by the order
-    transactions appear: the Nth transaction on a page corresponds to the
-    Nth (page, x_row) key in the sorted amounts dict.
+    Block boundary rule: a new transaction starts immediately after the balance
+    line. Every transaction ends with two consecutive VND amount lines:
+    the debit/credit amount then the running balance. The next line after the
+    balance line is the first line of the next transaction.
     """
     transactions: list[Transaction] = []
     warnings: list[str] = []
 
-    # Build ordered list of amount rows per page (skip opening-balance row)
-    # The opening balance is at a special x position that has only 'balance' key
+    # Build ordered list of amount rows per page (rows that have debit or credit + balance)
     page_rows: dict[int, list[tuple[int, dict[str, Decimal]]]] = {}
     for (pg, x_key), cols in sorted(amounts.items()):
         if ("debit" in cols or "credit" in cols) and "balance" in cols:
             page_rows.setdefault(pg, []).append((x_key, cols))
 
-    # Parse line blocks — each transaction starts with a date line
-    # Sentinel lines that mark end of a transaction
+    # --- Split text into transaction blocks ---
+    # Strategy: split after each balance line (two consecutive VND amount lines).
+    # Skip everything before the opening balance sentinel.
     STOP_PREFIXES = (
         "Cộng doanh số",
         "Số dư cuối kỳ",
-        "Số dư đầu kỳ",
         "Diễn giải/",
     )
 
-    # Collect transactions as line groups
     txn_blocks: list[list[str]] = []
     current: list[str] = []
-    in_transactions = False
-    # Gate: skip lines until we've seen the 'Số dư đầu kỳ' (Opening balance)
-    # sentinel row, which immediately precedes the first real transaction.
     past_opening_balance = False
+    past_opening_value = False  # skip the opening balance number itself
+    prev_was_amount = False
+    split_next = False  # split before the next non-noise line
+    done = False  # stop collecting after footer sentinel
 
     for line in all_lines:
         if _is_noise(line):
             continue
 
-        # The opening-balance row marks the boundary between header and data
         if not past_opening_balance:
             if line.startswith("Số dư đầu kỳ"):
                 past_opening_balance = True
-            continue  # skip everything up to and including the opening balance line
+            prev_was_amount = False
+            continue
 
-        # Skip the opening-balance amount that follows on the next line(s)
-        # (pure numbers before the first date)
-        if not in_transactions and not DATE_RE.match(line):
+        # Skip the opening balance number line (e.g. "39,075,579")
+        if not past_opening_value:
+            if AMOUNT_VND_RE.match(line):
+                past_opening_value = True
+            prev_was_amount = False
+            continue
+
+        if done:
             continue
 
         if any(line.startswith(p) for p in STOP_PREFIXES):
             if current:
                 txn_blocks.append(current)
                 current = []
-            in_transactions = False
+            prev_was_amount = False
+            split_next = False
+            done = True
             continue
 
-        if DATE_RE.match(line):
+        is_amount = bool(AMOUNT_VND_RE.match(line))
+
+        if split_next:
             if current:
                 txn_blocks.append(current)
                 current = []
-            in_transactions = True
+            split_next = False
 
-        if in_transactions:
-            current.append(line)
+        current.append(line)
+
+        # Two consecutive amount lines = debit/credit then balance → split after this line
+        if is_amount and prev_was_amount:
+            split_next = True
+
+        prev_was_amount = is_amount
 
     if current:
         txn_blocks.append(current)
@@ -224,6 +241,12 @@ def _parse_transactions(
             f"Row count mismatch: {len(txn_blocks)} text blocks vs "
             f"{len(ordered_rows)} spatial rows — some transactions may be wrong"
         )
+        logger.debug("--- text blocks (%d) ---", len(txn_blocks))
+        for i, blk in enumerate(txn_blocks):
+            logger.debug("  text[%d]: %s", i, blk[:3])
+        logger.debug("--- spatial rows (%d) ---", len(ordered_rows))
+        for i, (x_key, cols) in enumerate(ordered_rows):
+            logger.debug("  spatial[%d]: x_key=%s cols=%s", i, x_key, cols)
 
     for idx, block in enumerate(txn_blocks):
         if not block:
@@ -243,13 +266,14 @@ def _parse_transactions(
                 ref_idx = j
                 break
 
-        # Description: everything between date and ref (or end of block)
+        # Description: everything between date and ref (or end of block), excluding amounts
         end = ref_idx if ref_idx is not None else len(block)
-        desc_lines = [l for l in block[1:end] if l and not _is_noise(l)]
+        desc_lines = [
+            l for l in block[1:end]
+            if l and not _is_noise(l) and not AMOUNT_VND_RE.match(l)
+        ]
 
-        # Remitter / bank lines are the first desc lines; details are later ones
         description = " ".join(desc_lines)
-        # The last desc line is usually the user-entered note/merchant name
         merchant_name = desc_lines[-1] if desc_lines else None
 
         # Get amounts from spatial data
@@ -263,7 +287,6 @@ def _parse_transactions(
                 amount = cols.get("credit", Decimal(0))
             balance = cols.get("balance", None)
         else:
-            # Fallback: no spatial data available
             txn_type = TransactionType.DEBIT
             amount = Decimal(0)
             balance = None
@@ -315,7 +338,9 @@ def parse_bank_statement_pdf(
         metadata.source_file = str(pdf_path.name)
 
         amounts = _extract_spatial_amounts(doc)
-        transactions, warnings = _parse_transactions(all_lines, amounts, doc)
+        transactions, warnings = _parse_transactions(
+            all_lines, amounts, doc,
+        )
 
         logger.info(
             "Extracted %d transactions from bank statement %s",

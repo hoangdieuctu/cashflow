@@ -49,12 +49,17 @@
                 <h6 style="font-weight: 700; color: var(--tcb-navy); margin: 0;">
                     <i class="bi bi-cash-coin me-2" style="color: #059669;"></i>Salary Entries
                 </h6>
-                <button type="button" onclick="loadFromTransactions()" class="btn btn-sm" style="border: 1px solid #BBF7D0; color: #059669; border-radius: 8px; font-size: 0.75rem; font-weight: 600; background: #F0FDF4; padding: 0.25rem 0.65rem;">
-                    <i class="bi bi-download me-1"></i> Load
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" onclick="toggleSalaryList()" class="btn btn-sm" id="salaryViewBtn" style="border: 1px solid #E2E8F0; color: #64748B; border-radius: 8px; font-size: 0.75rem; font-weight: 600; background: #F8FAFC; padding: 0.25rem 0.65rem;">
+                        <i class="bi bi-eye me-1"></i> View
+                    </button>
+                    <button type="button" onclick="loadFromTransactions()" class="btn btn-sm" style="border: 1px solid #BBF7D0; color: #059669; border-radius: 8px; font-size: 0.75rem; font-weight: 600; background: #F0FDF4; padding: 0.25rem 0.65rem;">
+                        <i class="bi bi-download me-1"></i> Load
+                    </button>
+                </div>
             </div>
 
-            <div id="salaryList" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <div id="salaryList" style="display: none; flex-direction: column; gap: 0.4rem;">
                 {% for entry in salary_entries %}
                 <div class="salary-row d-flex align-items-center justify-content-between" data-entry-id="{{ entry.id }}" style="background: #F8FAFC; border-radius: 8px; padding: 0.4rem 0.75rem;">
                     <span style="font-size: 0.8rem; font-weight: 600; color: var(--tcb-navy);">{{ entry.year_month }}</span>
@@ -66,7 +71,7 @@
             </div>
 
             {% if salary_entries %}
-            <div class="d-flex justify-content-between mt-2 pt-2" style="border-top: 1px solid #F1F5F9;">
+            <div id="salaryTotal" class="d-flex justify-content-between mt-2 pt-2" style="display: none !important; border-top: 1px solid #F1F5F9;">
                 <span style="font-size: 0.75rem; color: #64748B; font-weight: 600;">Total</span>
                 <span style="font-size: 0.82rem; font-weight: 800; color: #059669;" id="totalSalaryLabel">{{ "{:,.0f}".format(total_salary) }}</span>
             </div>
@@ -128,7 +133,7 @@
                 </div>
                 <div>
                     <div style="font-size: 0.68rem; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Total Spent {% if year_month %}<span style="color:#BFDBFE;">{{ year_month }}</span>{% else %}<span style="color:#BFDBFE;">All time</span>{% endif %}</div>
-                    <div style="font-size: 1rem; font-weight: 800; color: #DC2626;">{{ "{:,.0f}".format(total_spent) }}</div>
+                    <div style="font-size: 1rem; font-weight: 800; color: {{ '#059669' if total_spent >= 0 else '#DC2626' }};">{{ "{:,.0f}".format(total_spent) }}</div>
                 </div>
                 <div>
                     <div style="font-size: 0.68rem; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Total Balance</div>
@@ -172,7 +177,7 @@
                             </div>
                             <div>
                                 <div style="font-size: 0.68rem; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Spent {% if year_month %}<span style="color:#BFDBFE;">{{ year_month }}</span>{% else %}<span style="color:#BFDBFE;">All time</span>{% endif %}</div>
-                                <div style="font-size: 0.9rem; font-weight: 700; color: #DC2626;">{{ "{:,.0f}".format(fund.spent) }}</div>
+                                <div style="font-size: 0.9rem; font-weight: 700; color: {{ '#059669' if fund.spent >= 0 else '#DC2626' }};">{{ "{:,.0f}".format(fund.spent) }}</div>
                             </div>
                             <div>
                                 <div style="font-size: 0.68rem; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">
@@ -452,12 +457,13 @@ function saveFundEdit(id, btn) {
 const historyTypeConfig = {
     topup:  { icon: 'bi-arrow-down-circle-fill', color: '#059669', bg: '#F0FDF4' },
     manual: { icon: 'bi-pencil-fill',            color: '#D97706', bg: '#FFFBEB' },
-    spend:  { icon: 'bi-arrow-up-circle-fill',   color: '#DC2626', bg: '#FEF2F2' },
+    debit:  { icon: 'bi-arrow-up-circle-fill',   color: '#DC2626', bg: '#FEF2F2' },
+    credit: { icon: 'bi-arrow-down-circle-fill', color: '#059669', bg: '#F0FDF4' },
     saving: { icon: 'bi-piggy-bank-fill',         color: '#2563EB', bg: '#EFF6FF' },
 };
 
 function renderEvent(e) {
-    const cfg = historyTypeConfig[e.type] || historyTypeConfig.spend;
+    const cfg = historyTypeConfig[e.type] || historyTypeConfig.debit;
     const fmtAmt = n => (n >= 0 ? '+' : '-') + new Intl.NumberFormat('vi-VN').format(Math.abs(Math.round(n)));
     const note = e.note ? e.note.substring(0, 60) + (e.note.length > 60 ? '…' : '') : '';
     const cat = e.category ? `<span style="font-size:0.65rem;background:#F0FDF4;color:#16A34A;border-radius:4px;padding:0.05rem 0.3rem;margin-left:4px;">${e.category}</span>` : '';
@@ -597,6 +603,17 @@ function showNotify(msg) {
     el.innerHTML = msg + '<button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>';
     document.querySelector('.flash-container').appendChild(el);
     setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 200); }, 3000);
+}
+
+// ── Toggle Salary List ────────────────────────────────────────────
+function toggleSalaryList() {
+    const list = document.getElementById('salaryList');
+    const total = document.getElementById('salaryTotal');
+    const btn = document.getElementById('salaryViewBtn');
+    const visible = list.style.display === 'flex';
+    list.style.display = visible ? 'none' : 'flex';
+    if (total) total.style.setProperty('display', visible ? 'none' : 'flex', 'important');
+    btn.innerHTML = visible ? '<i class="bi bi-eye me-1"></i> View' : '<i class="bi bi-eye-slash me-1"></i> Hide';
 }
 
 // ── Load from transactions ────────────────────────────────────────

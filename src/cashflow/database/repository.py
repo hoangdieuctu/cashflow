@@ -657,16 +657,18 @@ class Repository:
             pct = fund["percentage"] / 100.0
             allocated = total_salary * pct
 
-            # Sum debits for all categories assigned to this fund
+            # spent = sum of debits - sum of credits (net spending)
+            # balance = allocated - spent
             cats = fund["categories"]
             if cats:
                 placeholders = ",".join("?" * len(cats))
                 # all-time spent (for balance calculation)
                 row = self.conn.execute(
-                    f"""SELECT COALESCE(SUM(CAST(billing_amount_vnd AS REAL)), 0) as total
+                    f"""SELECT
+                           COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
+                           COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as total
                         FROM transactions
-                        WHERE transaction_type = 'debit'
-                          AND category IN ({placeholders})""",
+                        WHERE category IN ({placeholders})""",
                     cats,
                 ).fetchone()
                 spent_alltime = row["total"]
@@ -674,10 +676,11 @@ class Repository:
                 # period spent (for display, filtered by year_month if given)
                 if year_month:
                     row2 = self.conn.execute(
-                        f"""SELECT COALESCE(SUM(CAST(billing_amount_vnd AS REAL)), 0) as total
+                        f"""SELECT
+                               COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
+                               COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as total
                             FROM transactions
-                            WHERE transaction_type = 'debit'
-                              AND category IN ({placeholders})
+                            WHERE category IN ({placeholders})
                               AND substr(transaction_date, 1, 7) = ?""",
                         cats + [year_month],
                     ).fetchone()
@@ -697,10 +700,10 @@ class Repository:
                 placeholders = ",".join("?" * len(cats))
                 rows = self.conn.execute(
                     f"""SELECT substr(transaction_date, 1, 7) as ym,
-                               SUM(CAST(billing_amount_vnd AS REAL)) as spent
+                               COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
+                               COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as spent
                         FROM transactions
-                        WHERE transaction_type = 'debit'
-                          AND category IN ({placeholders})
+                        WHERE category IN ({placeholders})
                         GROUP BY ym""",
                     cats,
                 ).fetchall()
@@ -730,12 +733,12 @@ class Repository:
                 placeholders = ",".join("?" * len(cats))
                 if year_month:
                     txn_count = self.conn.execute(
-                        f"SELECT COUNT(*) as cnt FROM transactions WHERE transaction_type='debit' AND category IN ({placeholders}) AND substr(transaction_date,1,7) = ?",
+                        f"SELECT COUNT(*) as cnt FROM transactions WHERE category IN ({placeholders}) AND substr(transaction_date,1,7) = ?",
                         cats + [year_month],
                     ).fetchone()["cnt"]
                 else:
                     txn_count = self.conn.execute(
-                        f"SELECT COUNT(*) as cnt FROM transactions WHERE transaction_type='debit' AND category IN ({placeholders})",
+                        f"SELECT COUNT(*) as cnt FROM transactions WHERE category IN ({placeholders})",
                         cats,
                     ).fetchone()["cnt"]
 
@@ -753,7 +756,7 @@ class Repository:
                 "categories": cats,
                 "allocated": allocated,
                 "spent": spent,
-                "balance": fund["override_balance"] if fund.get("override_balance") is not None else allocated - spent_alltime + savings_principal,
+                "balance": allocated + spent_alltime,
                 "is_override": has_manual,
                 "history_count": log_count + txn_count + savings_count,
                 "monthly": dict(sorted(monthly.items())),
@@ -787,7 +790,7 @@ class Repository:
                 "note": r["note"],
             })
 
-        # Spending transactions in assigned categories
+        # Transactions in assigned categories (debit = negative, credit = positive)
         cats = fund["categories"]
         if cats:
             placeholders = ",".join("?" * len(cats))
@@ -797,19 +800,22 @@ class Repository:
                 ym_filter = "AND substr(transaction_date, 1, 7) = ?"
                 params.append(year_month)
             rows = self.conn.execute(
-                f"""SELECT transaction_date, description, billing_amount_vnd, category
+                f"""SELECT transaction_date, description, billing_amount_vnd, category, transaction_type
                     FROM transactions
-                    WHERE transaction_type = 'debit' AND category IN ({placeholders})
+                    WHERE category IN ({placeholders})
                     {ym_filter}
                     ORDER BY transaction_date DESC""",
                 params,
             ).fetchall()
             for r in rows:
+                amount = float(r["billing_amount_vnd"])
+                if r["transaction_type"] == "debit":
+                    amount = -amount
                 events.append({
-                    "type": "spend",
+                    "type": r["transaction_type"],
                     "date": r["transaction_date"],
                     "sort_key": r["transaction_date"],
-                    "amount": -float(r["billing_amount_vnd"]),
+                    "amount": amount,
                     "note": r["description"],
                     "category": r["category"],
                 })
