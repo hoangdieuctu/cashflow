@@ -129,6 +129,13 @@ def create_app(db_path: str | None = None) -> Flask:
         result["now_date"] = date.today().isoformat()
         return result
 
+    @app.template_filter("strip_purchase_prefix")
+    def strip_purchase_prefix_filter(value: str) -> str:
+        import re
+        if value:
+            value = re.sub(r"^Giao dịch thanh toán/Purchase - (?:Số Thẻ/Card No: \S+\s*)?", "", value)
+        return value
+
     @app.template_filter("todatetime")
     def todatetime_filter(value):
         from datetime import date

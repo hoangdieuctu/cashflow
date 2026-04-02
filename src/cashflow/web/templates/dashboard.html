@@ -310,7 +310,7 @@
                     <tr>
                         <td class="text-nowrap fw-medium">{{ txn.transaction_date }}</td>
                         <td style="max-width: 350px;">
-                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ txn.description }}">{{ txn.description }}</div>
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ txn.description }}">{{ txn.description|strip_purchase_prefix }}</div>
                         </td>
                         <td class="text-end amount-{{ txn.transaction_type }}">
                             {{ "+" if txn.transaction_type == "credit" else "-" }}{{ "{:,.0f}".format(txn.billing_amount_vnd|float) }}
