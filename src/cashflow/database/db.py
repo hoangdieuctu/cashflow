@@ -85,6 +85,14 @@ CREATE TABLE IF NOT EXISTS salary_entries (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS bonus_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS fund_balance_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fund_id INTEGER NOT NULL,
@@ -411,6 +419,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
             description TEXT,
             amount REAL NOT NULL DEFAULT 0,
             unit TEXT NOT NULL DEFAULT 'VND',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
+    # Create bonus_entries table if it doesn't exist
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bonus_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            year_month TEXT NOT NULL,
+            amount REAL NOT NULL,
+            note TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)

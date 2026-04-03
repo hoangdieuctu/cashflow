@@ -631,14 +631,67 @@ class Repository:
         return entry_id
 
     def delete_salary_entry(self, entry_id: int) -> bool:
-        cursor = self.conn.execute("DELETE FROM salary_entries WHERE id = ?", (entry_id,))
+        row = self.conn.execute(
+            "SELECT year_month FROM salary_entries WHERE id = ?", (entry_id,)
+        ).fetchone()
+        if not row:
+            return False
+        year_month = row["year_month"]
+        self.conn.execute("DELETE FROM salary_entries WHERE id = ?", (entry_id,))
+        self.conn.execute(
+            "DELETE FROM fund_balance_log WHERE type = 'topup' AND note = ?",
+            (f"Salary {year_month}",),
+        )
         self.conn.commit()
-        return cursor.rowcount > 0
+        return True
+
+    def get_bonus_entries(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM bonus_entries ORDER BY year_month DESC, created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_bonus_entry(self, year_month: str, amount: float, note: str | None = None) -> int:
+        cursor = self.conn.execute(
+            "INSERT INTO bonus_entries (year_month, amount, note) VALUES (?, ?, ?)",
+            (year_month, amount, note),
+        )
+        entry_id = cursor.lastrowid
+        funds = self.get_funds()
+        for fund in funds:
+            topup = amount * (fund["percentage"] / 100.0)
+            self.conn.execute(
+                """INSERT INTO fund_balance_log (fund_id, type, date, amount, note)
+                   VALUES (?, 'topup', ?, ?, ?)""",
+                (fund["id"], year_month + "-01", topup, f"Bonus {entry_id} {year_month}"),
+            )
+        self.conn.commit()
+        return entry_id
+
+    def delete_bonus_entry(self, entry_id: int) -> bool:
+        row = self.conn.execute(
+            "SELECT id FROM bonus_entries WHERE id = ?", (entry_id,)
+        ).fetchone()
+        if not row:
+            return False
+        self.conn.execute("DELETE FROM bonus_entries WHERE id = ?", (entry_id,))
+        self.conn.execute(
+            "DELETE FROM fund_balance_log WHERE type = 'topup' AND note = ?",
+            (f"Bonus {entry_id} ",),  # prefix match handled below
+        )
+        # Use LIKE for the note pattern
+        self.conn.execute(
+            "DELETE FROM fund_balance_log WHERE type = 'topup' AND note LIKE ?",
+            (f"Bonus {entry_id} %",),
+        )
+        self.conn.commit()
+        return True
 
     def get_fund_balances(self, year_month: str | None = None) -> list[dict[str, Any]]:
         """Calculate running balance for each fund.
 
         Balance = sum of (salary × percentage/100) for all salary entries
+                  + sum of (bonus × percentage/100) for all bonus entries
                   minus sum of debit transactions in assigned categories (all-time).
         Carry-over is implicit since we sum all time.
 
@@ -646,43 +699,58 @@ class Repository:
                     allocated and balance always reflect all-time totals.
         """
         funds = self.get_funds()
-        salary_entries = self.get_salary_entries()
-        total_salary = sum(e["amount"] for e in salary_entries)
-
-        # Per-month breakdown for top-ups
-        salary_by_month = {e["year_month"]: e["amount"] for e in salary_entries}
 
         results = []
         for fund in funds:
-            pct = fund["percentage"] / 100.0
-            allocated = total_salary * pct
+            # allocated = sum of actual topup log entries (salary + bonus distributed to this fund)
+            allocated_row = self.conn.execute(
+                "SELECT COALESCE(SUM(amount), 0) as total FROM fund_balance_log WHERE fund_id = ? AND type = 'topup'",
+                (fund["id"],),
+            ).fetchone()
+            allocated = allocated_row["total"]
 
             # spent = sum of debits - sum of credits (net spending)
             # balance = allocated - spent
             cats = fund["categories"]
+            include_uncat = "__uncategorized__" in cats
+            named_cats = [c for c in cats if c != "__uncategorized__"]
+
+            def _cat_filter(param_list: list) -> tuple[str, list]:
+                """Build a WHERE category condition and extend param_list. Returns (sql_fragment, updated_params)."""
+                parts = []
+                p = list(param_list)
+                if named_cats:
+                    ph = ",".join("?" * len(named_cats))
+                    parts.append(f"category IN ({ph})")
+                    p = list(named_cats) + p
+                if include_uncat:
+                    parts.append("(category IS NULL OR category = '')")
+                return ("(" + " OR ".join(parts) + ")" if parts else "1=0"), p
+
             if cats:
-                placeholders = ",".join("?" * len(cats))
+                cat_cond, base_params = _cat_filter([])
                 # all-time spent (for balance calculation)
                 row = self.conn.execute(
                     f"""SELECT
                            COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
                            COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as total
                         FROM transactions
-                        WHERE category IN ({placeholders})""",
-                    cats,
+                        WHERE {cat_cond}""",
+                    base_params,
                 ).fetchone()
                 spent_alltime = row["total"]
 
                 # period spent (for display, filtered by year_month if given)
                 if year_month:
+                    cat_cond2, ym_params = _cat_filter([year_month])
                     row2 = self.conn.execute(
                         f"""SELECT
                                COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
                                COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as total
                             FROM transactions
-                            WHERE category IN ({placeholders})
+                            WHERE {cat_cond2}
                               AND substr(transaction_date, 1, 7) = ?""",
-                        cats + [year_month],
+                        ym_params,
                     ).fetchone()
                     spent = row2["total"]
                 else:
@@ -691,21 +759,27 @@ class Repository:
                 spent = 0.0
                 spent_alltime = 0.0
 
-            # Monthly breakdown: top-ups and spending per month
-            monthly = {}
-            for ym, sal in salary_by_month.items():
-                monthly[ym] = {"topup": sal * pct, "spent": 0.0}
+            # Monthly breakdown: top-ups (from actual log) and spending per month
+            monthly: dict[str, dict[str, float]] = {}
+            topup_rows = self.conn.execute(
+                """SELECT substr(date, 1, 7) as ym, COALESCE(SUM(amount), 0) as total
+                   FROM fund_balance_log WHERE fund_id = ? AND type = 'topup'
+                   GROUP BY ym""",
+                (fund["id"],),
+            ).fetchall()
+            for r in topup_rows:
+                monthly[r["ym"]] = {"topup": r["total"], "spent": 0.0}
 
             if cats:
-                placeholders = ",".join("?" * len(cats))
+                cat_cond3, base_params3 = _cat_filter([])
                 rows = self.conn.execute(
                     f"""SELECT substr(transaction_date, 1, 7) as ym,
                                COALESCE(SUM(CASE WHEN transaction_type='credit' THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) -
                                COALESCE(SUM(CASE WHEN transaction_type='debit'  THEN CAST(billing_amount_vnd AS REAL) ELSE 0 END), 0) as spent
                         FROM transactions
-                        WHERE category IN ({placeholders})
+                        WHERE {cat_cond3}
                         GROUP BY ym""",
-                    cats,
+                    base_params3,
                 ).fetchall()
                 for r in rows:
                     if r["ym"] not in monthly:
@@ -730,16 +804,16 @@ class Repository:
 
             txn_count = 0
             if cats:
-                placeholders = ",".join("?" * len(cats))
+                cat_cond4, base_params4 = _cat_filter([])
                 if year_month:
                     txn_count = self.conn.execute(
-                        f"SELECT COUNT(*) as cnt FROM transactions WHERE category IN ({placeholders}) AND substr(transaction_date,1,7) = ?",
-                        cats + [year_month],
+                        f"SELECT COUNT(*) as cnt FROM transactions WHERE {cat_cond4} AND substr(transaction_date,1,7) = ?",
+                        base_params4 + [year_month],
                     ).fetchone()["cnt"]
                 else:
                     txn_count = self.conn.execute(
-                        f"SELECT COUNT(*) as cnt FROM transactions WHERE category IN ({placeholders})",
-                        cats,
+                        f"SELECT COUNT(*) as cnt FROM transactions WHERE {cat_cond4}",
+                        base_params4,
                     ).fetchone()["cnt"]
 
             has_manual = self.conn.execute(
@@ -793,32 +867,46 @@ class Repository:
         # Transactions in assigned categories (debit = negative, credit = positive)
         cats = fund["categories"]
         if cats:
-            placeholders = ",".join("?" * len(cats))
-            params: list[Any] = list(cats)
+            include_uncategorized = "__uncategorized__" in cats
+            named_cats = [c for c in cats if c != "__uncategorized__"]
             ym_filter = ""
+            params: list[Any] = []
             if year_month:
                 ym_filter = "AND substr(transaction_date, 1, 7) = ?"
-                params.append(year_month)
-            rows = self.conn.execute(
-                f"""SELECT transaction_date, description, billing_amount_vnd, category, transaction_type
-                    FROM transactions
-                    WHERE category IN ({placeholders})
-                    {ym_filter}
-                    ORDER BY transaction_date DESC""",
-                params,
-            ).fetchall()
-            for r in rows:
-                amount = float(r["billing_amount_vnd"])
-                if r["transaction_type"] == "debit":
-                    amount = -amount
-                events.append({
-                    "type": r["transaction_type"],
-                    "date": r["transaction_date"],
-                    "sort_key": r["transaction_date"],
-                    "amount": amount,
-                    "note": r["description"],
-                    "category": r["category"],
-                })
+
+            conditions = []
+            if named_cats:
+                placeholders = ",".join("?" * len(named_cats))
+                conditions.append(f"category IN ({placeholders})")
+                params = list(named_cats)
+            if include_uncategorized:
+                conditions.append("(category IS NULL OR category = '')")
+
+            if conditions:
+                cat_filter = "(" + " OR ".join(conditions) + ")"
+                ym_params: list[Any] = []
+                if year_month:
+                    ym_params = [year_month]
+                rows = self.conn.execute(
+                    f"""SELECT transaction_date, description, billing_amount_vnd, category, transaction_type
+                        FROM transactions
+                        WHERE {cat_filter}
+                        {ym_filter}
+                        ORDER BY transaction_date DESC""",
+                    params + ym_params,
+                ).fetchall()
+                for r in rows:
+                    amount = float(r["billing_amount_vnd"])
+                    if r["transaction_type"] == "debit":
+                        amount = -amount
+                    events.append({
+                        "type": r["transaction_type"],
+                        "date": r["transaction_date"],
+                        "sort_key": r["transaction_date"],
+                        "amount": amount,
+                        "note": r["description"],
+                        "category": r["category"] or "__uncategorized__",
+                    })
 
         # Linked savings — always unfiltered (not month-scoped)
         import calendar as _cal

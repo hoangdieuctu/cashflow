@@ -506,13 +506,15 @@ def funds():
     with _get_repo() as repo:
         balances = repo.get_fund_balances(year_month=year_month)
         salary_entries = repo.get_salary_entries()
-        all_categories = repo.get_all_categories()
+        bonus_entries = repo.get_bonus_entries()
+        all_categories = ["__uncategorized__"] + repo.get_all_categories()
         period_options = repo.get_available_years_months()
         assigned = {cat for f in balances for cat in f["categories"]}
     return render_template(
         "funds.html",
         funds=balances,
         salary_entries=salary_entries,
+        bonus_entries=bonus_entries,
         all_categories=all_categories,
         assigned_categories=assigned,
         period_options=period_options,
@@ -555,13 +557,6 @@ def update_fund(fund_id: int):
     name = (data.get("name") or "").strip() or None
     percentage = data.get("percentage")
     description = data.get("description")
-    # override_balance: not in payload = don't touch; null = clear; number = set
-    override_balance = False  # sentinel: not provided
-    override_reason = None
-    if "override_balance" in data:
-        v = data["override_balance"]
-        override_balance = float(v) if v is not None else None
-        override_reason = (data.get("override_reason") or "").strip() or None
     if percentage is not None:
         try:
             percentage = float(percentage)
@@ -570,7 +565,7 @@ def update_fund(fund_id: int):
     if description is not None:
         description = description.strip()
     with _get_repo() as repo:
-        ok = repo.update_fund(fund_id, name=name, percentage=percentage, description=description, override_balance=override_balance, override_reason=override_reason)
+        ok = repo.update_fund(fund_id, name=name, percentage=percentage, description=description)
     if not ok:
         return jsonify({"error": "Fund not found"}), 404
     return jsonify({"ok": True})
@@ -618,7 +613,39 @@ def add_salary():
 
 @bp.route("/api/salary/<int:entry_id>", methods=["DELETE"])
 def delete_salary(entry_id: int):
-    return jsonify({"error": "Salary entries cannot be deleted"}), 403
+    with _get_repo() as repo:
+        ok = repo.delete_salary_entry(entry_id)
+    if not ok:
+        return jsonify({"error": "Salary entry not found"}), 404
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/bonus", methods=["POST"])
+def add_bonus():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    year_month = (data.get("year_month") or "").strip()
+    amount = data.get("amount")
+    note = (data.get("note") or "").strip() or None
+    if not year_month or len(year_month) != 7:
+        return jsonify({"error": "year_month must be YYYY-MM"}), 400
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount must be a number"}), 400
+    with _get_repo() as repo:
+        entry_id = repo.add_bonus_entry(year_month, amount, note)
+    return jsonify({"ok": True, "id": entry_id})
+
+
+@bp.route("/api/bonus/<int:entry_id>", methods=["DELETE"])
+def delete_bonus(entry_id: int):
+    with _get_repo() as repo:
+        ok = repo.delete_bonus_entry(entry_id)
+    if not ok:
+        return jsonify({"error": "Bonus entry not found"}), 404
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/salary/from-transactions")

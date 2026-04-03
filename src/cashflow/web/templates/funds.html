@@ -63,7 +63,12 @@
                 {% for entry in salary_entries %}
                 <div class="salary-row d-flex align-items-center justify-content-between" data-entry-id="{{ entry.id }}" style="background: #F8FAFC; border-radius: 8px; padding: 0.4rem 0.75rem;">
                     <span style="font-size: 0.8rem; font-weight: 600; color: var(--tcb-navy);">{{ entry.year_month }}</span>
-                    <span style="font-size: 0.82rem; font-weight: 700; color: #059669;">{{ "{:,.0f}".format(entry.amount) }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size: 0.82rem; font-weight: 700; color: #059669;">{{ "{:,.0f}".format(entry.amount) }}</span>
+                        <button onclick="unloadSalary({{ entry.id }}, '{{ entry.year_month }}', this)" style="background:none;border:none;padding:0;color:#CBD5E1;cursor:pointer;font-size:0.75rem;" title="Unload & rollback">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
                 </div>
                 {% else %}
                 <div id="salaryEmpty" class="text-center py-2" style="color: #94A3B8; font-size: 0.82rem;">No salary entries yet.</div>
@@ -74,6 +79,61 @@
             <div id="salaryTotal" class="d-flex justify-content-between mt-2 pt-2" style="display: none !important; border-top: 1px solid #F1F5F9;">
                 <span style="font-size: 0.75rem; color: #64748B; font-weight: 600;">Total</span>
                 <span style="font-size: 0.82rem; font-weight: 800; color: #059669;" id="totalSalaryLabel">{{ "{:,.0f}".format(total_salary) }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Bonus Entries -->
+        {% set total_bonus = bonus_entries | sum(attribute='amount') %}
+        <div class="card" style="padding: 1.25rem; margin-top: 1rem;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h6 style="font-weight: 700; color: var(--tcb-navy); margin: 0;">
+                    <i class="bi bi-gift me-2" style="color: #7C3AED;"></i>Bonus Entries
+                </h6>
+                <div class="d-flex gap-2">
+                    <button type="button" onclick="toggleBonusList()" class="btn btn-sm" id="bonusViewBtn" style="border: 1px solid #E2E8F0; color: #64748B; border-radius: 8px; font-size: 0.75rem; font-weight: 600; background: #F8FAFC; padding: 0.25rem 0.65rem;">
+                        <i class="bi bi-eye me-1"></i> View
+                    </button>
+                    <button type="button" onclick="toggleBonusEntry()" class="btn btn-sm" id="bonusEntryBtn" style="border: 1px solid #DDD6FE; color: #7C3AED; border-radius: 8px; font-size: 0.75rem; font-weight: 600; background: #F5F3FF; padding: 0.25rem 0.65rem;">
+                        <i class="bi bi-plus me-1"></i> Add
+                    </button>
+                </div>
+            </div>
+
+            <div id="bonusEntryForm" style="display:none; margin-bottom:0.75rem;">
+                <div class="d-flex gap-1 align-items-center flex-wrap">
+                    <input type="month" id="bonusYearMonth" class="form-control form-control-sm" style="border-radius:6px;border-color:#DDD6FE;font-size:0.8rem;width:140px;">
+                    <input type="number" id="bonusAmount" class="form-control form-control-sm" placeholder="Amount" min="0" step="1000" style="border-radius:6px;border-color:#DDD6FE;font-size:0.8rem;width:140px;">
+                    <input type="text" id="bonusNote" class="form-control form-control-sm" placeholder="Note (optional)" style="border-radius:6px;border-color:#DDD6FE;font-size:0.8rem;width:140px;">
+                    <button onclick="addBonusEntry(this)" class="btn btn-sm" style="background:#7C3AED;color:#fff;border-radius:6px;font-size:0.78rem;font-weight:600;padding:0.25rem 0.65rem;">
+                        <i class="bi bi-plus-lg me-1"></i>Add
+                    </button>
+                </div>
+            </div>
+
+            <div id="bonusList" style="display: none; flex-direction: column; gap: 0.4rem;">
+                {% for entry in bonus_entries %}
+                <div class="d-flex align-items-center justify-content-between" style="background: #F8FAFC; border-radius: 8px; padding: 0.4rem 0.75rem;">
+                    <div>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--tcb-navy);">{{ entry.year_month }}</span>
+                        {% if entry.note %}<span style="font-size: 0.72rem; color: #94A3B8; margin-left: 0.4rem;">{{ entry.note }}</span>{% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="font-size: 0.82rem; font-weight: 700; color: #7C3AED;">{{ "{:+,.0f}".format(entry.amount) }}</span>
+                        <button onclick="unloadBonus({{ entry.id }}, '{{ entry.year_month }}', this)" style="background:none;border:none;padding:0;color:#CBD5E1;cursor:pointer;font-size:0.75rem;" title="Unload & rollback">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-2" style="color: #94A3B8; font-size: 0.82rem;">No bonus entries yet.</div>
+                {% endfor %}
+            </div>
+
+            {% if bonus_entries %}
+            <div class="d-flex justify-content-between mt-2 pt-2" style="display: none !important; border-top: 1px solid #F1F5F9;" id="bonusTotal">
+                <span style="font-size: 0.75rem; color: #64748B; font-weight: 600;">Total</span>
+                <span style="font-size: 0.82rem; font-weight: 800; color: #7C3AED;">{{ "{:,.0f}".format(total_bonus) }}</span>
             </div>
             {% endif %}
         </div>
@@ -182,26 +242,11 @@
                             <div>
                                 <div style="font-size: 0.68rem; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">
                                     Balance
-                                    {% if fund.is_override %}<span style="font-size:0.6rem;background:#FEF3C7;color:#D97706;border-radius:4px;padding:0.05rem 0.35rem;font-weight:700;margin-left:3px;">manual</span>{% endif %}
                                 </div>
                                 <div class="balance-display d-flex align-items-center gap-1">
                                     <span class="balance-value" style="font-size: 0.9rem; font-weight: 800; color: {% if fund.balance >= 0 %}#059669{% else %}#DC2626{% endif %};">
                                         {{ "{:+,.0f}".format(fund.balance) }}
                                     </span>
-                                    <button onclick="openBalanceEdit({{ fund.id }}, this)" style="background:none;border:none;padding:0;color:#CBD5E1;cursor:pointer;font-size:0.7rem;" title="Set manual balance">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                </div>
-                                <div class="balance-edit-inline" style="display:none;">
-                                    <div class="d-flex flex-column gap-1">
-                                        <div class="d-flex align-items-center gap-1">
-                                            <input type="number" class="form-control form-control-sm balance-input" value="{{ fund.override_balance if fund.override_balance is not none else fund.balance }}" step="1000" style="border-radius:6px;border-color:#BFDBFE;font-size:0.8rem;width:130px;padding:0.2rem 0.4rem;">
-                                            <button onclick="saveBalance({{ fund.id }}, this)" style="background:#059669;color:#fff;border:none;border-radius:5px;padding:0.2rem 0.45rem;font-size:0.72rem;cursor:pointer;" title="Save"><i class="bi bi-check-lg"></i></button>
-                                            <button onclick="clearBalance({{ fund.id }}, this)" style="background:#F59E0B;color:#fff;border:none;border-radius:5px;padding:0.2rem 0.45rem;font-size:0.72rem;cursor:pointer;" title="Reset to calculated"><i class="bi bi-arrow-counterclockwise"></i></button>
-                                            <button onclick="cancelBalanceEdit(this)" style="background:none;border:none;padding:0;color:#94A3B8;cursor:pointer;font-size:0.72rem;" title="Cancel"><i class="bi bi-x-lg"></i></button>
-                                        </div>
-                                        <input type="text" class="form-control form-control-sm balance-reason" placeholder="Reason (optional)" style="border-radius:6px;border-color:#BFDBFE;font-size:0.78rem;">
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -214,7 +259,7 @@
                         <!-- Categories -->
                         <div class="d-flex flex-wrap gap-1 fund-cats-display">
                             {% for cat in fund.categories %}
-                            <span style="font-size: 0.72rem; font-weight: 600; background: #F0FDF4; color: #16A34A; padding: 0.15rem 0.5rem; border-radius: 5px;">{{ cat }}</span>
+                            <span style="font-size: 0.72rem; font-weight: 600; background: #F0FDF4; color: #16A34A; padding: 0.15rem 0.5rem; border-radius: 5px;">{% if cat == '__uncategorized__' %}Uncategorized{% else %}{{ cat }}{% endif %}</span>
                             {% else %}
                             <span style="font-size: 0.72rem; color: #94A3B8;">No categories assigned</span>
                             {% endfor %}
@@ -259,7 +304,7 @@
                             {% for cat in fund.categories %}
                             <span class="cat-chip selected-chip" data-cat="{{ cat }}"
                                 style="display:inline-flex;align-items:center;gap:0.3rem;background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.78rem;font-weight:600;cursor:pointer;" title="Click to remove">
-                                {{ cat }} <i class="bi bi-x-lg" style="font-size:0.65rem;"></i>
+                                {% if cat == '__uncategorized__' %}Uncategorized{% else %}{{ cat }}{% endif %} <i class="bi bi-x-lg" style="font-size:0.65rem;"></i>
                             </span>
                             {% endfor %}
                         </div>
@@ -271,12 +316,12 @@
                                 {% if cat in assigned_categories %}
                                 <span class="cat-chip" data-cat="{{ cat }}"
                                     style="display:inline-flex;align-items:center;background:#F8FAFC;color:#CBD5E1;border:1px solid #F1F5F9;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.78rem;font-weight:600;cursor:not-allowed;" title="Already assigned to another fund">
-                                    {{ cat }} <i class="bi bi-lock-fill" style="font-size:0.6rem;margin-left:3px;"></i>
+                                    {% if cat == '__uncategorized__' %}Uncategorized{% else %}{{ cat }}{% endif %} <i class="bi bi-lock-fill" style="font-size:0.6rem;margin-left:3px;"></i>
                                 </span>
                                 {% else %}
                                 <span class="cat-chip avail-chip" data-cat="{{ cat }}"
                                     style="display:inline-flex;align-items:center;background:#F1F5F9;color:#475569;border:1px solid #E2E8F0;border-radius:6px;padding:0.2rem 0.55rem;font-size:0.78rem;font-weight:600;cursor:pointer;" title="Click to add">
-                                    {{ cat }}
+                                    {% if cat == '__uncategorized__' %}Uncategorized{% else %}{{ cat }}{% endif %}
                                 </span>
                                 {% endif %}
                             {% endif %}
@@ -360,7 +405,8 @@ document.getElementById('addFundForm').addEventListener('submit', function(e) {
 
 // ── Delete Salary ─────────────────────────────────────────────────
 
-function deleteSalary(id, btn) {
+function unloadSalary(id, yearMonth, btn) {
+    if (!confirm(`Unload salary entry for ${yearMonth}?\n\nThis will remove the entry and roll back all fund top-ups for that month.`)) return;
     btn.disabled = true;
     fetch('/api/salary/' + id, { method: 'DELETE' })
     .then(r => r.json())
@@ -529,55 +575,6 @@ function toggleHistory(id, btn) {
     });
 }
 
-// ── Balance override ──────────────────────────────────────────────
-function openBalanceEdit(id, btn) {
-    const card = document.querySelector(`.fund-card[data-fund-id="${id}"]`);
-    card.querySelector('.balance-display').style.display = 'none';
-    card.querySelector('.balance-edit-inline').style.display = 'block';
-    card.querySelector('.balance-input').focus();
-    card.querySelector('.balance-input').select();
-}
-
-function cancelBalanceEdit(btn) {
-    const card = btn.closest('.fund-card');
-    card.querySelector('.balance-edit-inline').style.display = 'none';
-    card.querySelector('.balance-display').style.display = '';
-}
-
-function saveBalance(id, btn) {
-    const card = document.querySelector(`.fund-card[data-fund-id="${id}"]`);
-    const val = parseFloat(card.querySelector('.balance-input').value);
-    const reason = card.querySelector('.balance-reason').value.trim();
-    if (isNaN(val)) { showNotify('Enter a valid number'); return; }
-    btn.disabled = true;
-    fetch('/api/funds/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ override_balance: val, override_reason: reason || null })
-    })
-    .then(r => r.json())
-    .then(res => {
-        btn.disabled = false;
-        if (res.ok) { showNotify('Balance updated'); location.reload(); }
-        else showNotify(res.error || 'Failed');
-    });
-}
-
-function clearBalance(id, btn) {
-    btn.disabled = true;
-    fetch('/api/funds/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ override_balance: null })
-    })
-    .then(r => r.json())
-    .then(res => {
-        btn.disabled = false;
-        if (res.ok) { showNotify('Balance reset to calculated'); location.reload(); }
-        else showNotify(res.error || 'Failed');
-    });
-}
-
 function deleteFund(id, btn) {
     if (btn.disabled) return;
     if (!confirm('Delete this fund?')) return;
@@ -614,6 +611,62 @@ function toggleSalaryList() {
     list.style.display = visible ? 'none' : 'flex';
     if (total) total.style.setProperty('display', visible ? 'none' : 'flex', 'important');
     btn.innerHTML = visible ? '<i class="bi bi-eye me-1"></i> View' : '<i class="bi bi-eye-slash me-1"></i> Hide';
+}
+
+// ── Bonus entries ─────────────────────────────────────────────────
+function toggleBonusList() {
+    const list = document.getElementById('bonusList');
+    const total = document.getElementById('bonusTotal');
+    const btn = document.getElementById('bonusViewBtn');
+    const visible = list.style.display === 'flex';
+    list.style.display = visible ? 'none' : 'flex';
+    if (total) total.style.setProperty('display', visible ? 'none' : 'flex', 'important');
+    btn.innerHTML = visible ? '<i class="bi bi-eye me-1"></i> View' : '<i class="bi bi-eye-slash me-1"></i> Hide';
+}
+
+function toggleBonusEntry() {
+    const form = document.getElementById('bonusEntryForm');
+    const btn = document.getElementById('bonusEntryBtn');
+    const visible = form.style.display !== 'none';
+    form.style.display = visible ? 'none' : 'block';
+    btn.innerHTML = visible ? '<i class="bi bi-plus me-1"></i> Add' : '<i class="bi bi-x me-1"></i> Cancel';
+    if (!visible) {
+        const now = new Date();
+        document.getElementById('bonusYearMonth').value = now.toISOString().slice(0, 7);
+        document.getElementById('bonusAmount').value = '';
+        document.getElementById('bonusNote').value = '';
+        document.getElementById('bonusAmount').focus();
+    }
+}
+
+function addBonusEntry(btn) {
+    const ym = document.getElementById('bonusYearMonth').value;
+    const amount = parseFloat(document.getElementById('bonusAmount').value);
+    const note = document.getElementById('bonusNote').value.trim();
+    if (!ym || !amount || amount <= 0) { showNotify('Enter a valid month and amount'); return; }
+    btn.disabled = true;
+    fetch('/api/bonus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year_month: ym, amount, note: note || null })
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        if (res.ok) { location.reload(); }
+        else showNotify(res.error || 'Failed');
+    });
+}
+
+function unloadBonus(id, yearMonth, btn) {
+    if (!confirm(`Unload bonus entry for ${yearMonth}?\n\nThis will remove the entry and roll back all fund top-ups for this bonus.`)) return;
+    btn.disabled = true;
+    fetch('/api/bonus/' + id, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) { location.reload(); }
+        else { btn.disabled = false; showNotify(res.error || 'Failed'); }
+    });
 }
 
 // ── Load from transactions ────────────────────────────────────────
