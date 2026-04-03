@@ -649,8 +649,7 @@ def savings():
     """Savings management page."""
     with _get_repo() as repo:
         all_savings = repo.get_savings()
-        all_funds = repo.get_funds()
-    return render_template("savings.html", savings=all_savings, funds=all_funds)
+    return render_template("savings.html", savings=all_savings)
 
 
 @bp.route("/api/savings", methods=["POST"])
@@ -665,8 +664,6 @@ def add_saving():
     start_date = (data.get("start_date") or "").strip()
     rollover_type = (data.get("rollover_type") or "withdraw").strip()
     note = (data.get("note") or "").strip()
-    fund_id_raw = data.get("fund_id")
-    fund_id = int(fund_id_raw) if fund_id_raw else None
     saving_type = (data.get("saving_type") or "fixed").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
@@ -683,7 +680,7 @@ def add_saving():
     except (TypeError, ValueError):
         return jsonify({"error": "principal, annual_rate, term_months must be numbers"}), 400
     with _get_repo() as repo:
-        saving_id = repo.add_saving(name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type)
+        saving_id = repo.add_saving(name, principal, annual_rate, term_months, start_date, rollover_type, note, None, saving_type)
     return jsonify({"ok": True, "id": saving_id})
 
 
@@ -699,8 +696,6 @@ def update_saving(saving_id: int):
     start_date = (data.get("start_date") or "").strip()
     rollover_type = (data.get("rollover_type") or "withdraw").strip()
     note = (data.get("note") or "").strip()
-    fund_id_raw = data.get("fund_id")
-    fund_id = int(fund_id_raw) if fund_id_raw else None
     saving_type = (data.get("saving_type") or "fixed").strip()
     if not name or not start_date:
         return jsonify({"error": "name and start_date are required"}), 400
@@ -715,7 +710,7 @@ def update_saving(saving_id: int):
     except (TypeError, ValueError):
         return jsonify({"error": "principal, annual_rate, term_months must be numbers"}), 400
     with _get_repo() as repo:
-        ok = repo.update_saving(saving_id, name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type)
+        ok = repo.update_saving(saving_id, name, principal, annual_rate, term_months, start_date, rollover_type, note, None, saving_type)
     if not ok:
         return jsonify({"error": "Saving not found"}), 404
     return jsonify({"ok": True})

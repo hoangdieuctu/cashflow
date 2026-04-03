@@ -59,15 +59,6 @@
                     </select>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Fund <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-                    <select class="form-select form-select-sm" id="savingFund" style="border-radius: 8px; border-color: #E2E8F0; font-size: 0.82rem;">
-                        <option value="">— No fund —</option>
-                        {% for f in funds %}
-                        <option value="{{ f.id }}">{{ f.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-2">
                     <label class="form-label" style="font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Type</label>
                     <div class="d-flex gap-2">
                         <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;padding:0.3rem 0.75rem;border:1px solid #E2E8F0;border-radius:8px;flex:1;justify-content:center;" id="typeFixedLabel">
@@ -137,13 +128,6 @@
                 <option value="rollover_principal">Keep principal</option>
                 <option value="rollover_full">Reinvest all</option>
             </select>
-            <select id="filterFund" class="form-select form-select-sm" style="width:auto;border-radius:8px;border-color:#E2E8F0;font-size:0.8rem;">
-                <option value="">All funds</option>
-                <option value="none">No fund</option>
-                {% for f in funds %}
-                <option value="{{ f.id }}">{{ f.name }}</option>
-                {% endfor %}
-            </select>
             <span id="filterCount" style="font-size:0.75rem;color:#94A3B8;margin-left:auto;"></span>
         </div>
         {% endif %}
@@ -186,7 +170,7 @@
         <div id="savingsGrid" style="display: flex; flex-direction: column; gap: 0.75rem;">
             {% if savings %}
                 {% for s in savings %}
-                <div class="saving-card" data-saving-id="{{ s.id }}" data-term="{{ s.term_months }}" data-rollover="{{ s.rollover_type }}" data-fund-id="{{ s.fund_id or '' }}" data-principal="{{ s.current_principal }}" data-interest="{{ s.interest }}" data-total="{{ s.total }}" data-status="{{ s.status }}" data-saving-type="{{ s.saving_type }}" style="border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; overflow: hidden;">
+                <div class="saving-card" data-saving-id="{{ s.id }}" data-term="{{ s.term_months }}" data-rollover="{{ s.rollover_type }}" data-principal="{{ s.current_principal }}" data-interest="{{ s.interest }}" data-total="{{ s.total }}" data-status="{{ s.status }}" data-saving-type="{{ s.saving_type }}" style="border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; overflow: hidden;">
 
                     <!-- View mode -->
                     <div class="saving-view" style="padding: 1rem 1.25rem;">
@@ -276,11 +260,6 @@
                               background: {{ rollover_bgs[s.rollover_type] }}; color: {{ rollover_colors[s.rollover_type] }};">
                             <i class="bi bi-arrow-repeat me-1"></i>{{ rollover_labels[s.rollover_type] }}
                         </span>
-                        {% if s.fund_name %}
-                        <span style="font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 5px; background: #FEF3C7; color: #D97706;">
-                            <i class="bi bi-wallet2 me-1"></i>{{ s.fund_name }}
-                        </span>
-                        {% endif %}
                     </div>
 
                     <!-- Projection table for rollover types -->
@@ -394,17 +373,6 @@
                         </div>
                         <div class="row g-2 mb-2">
                             <div class="col-12">
-                                <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Fund <span style="font-weight:400;">(optional)</span></label>
-                                <select class="form-select form-select-sm edit-fund" style="border-radius:6px;border-color:#BFDBFE;font-size:0.82rem;">
-                                    <option value="">— No fund —</option>
-                                    {% for f in funds %}
-                                    <option value="{{ f.id }}" {% if s.fund_id == f.id %}selected{% endif %}>{{ f.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col-12">
                                 <label style="font-size:0.7rem;color:#64748B;font-weight:600;display:block;">Type</label>
                                 <div class="d-flex gap-2">
                                     <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;padding:0.25rem 0.6rem;border:1px solid #BFDBFE;border-radius:6px;flex:1;justify-content:center;">
@@ -458,15 +426,13 @@ function applyFilters() {
     const type = document.getElementById('filterType')?.value || '';
     const term = document.getElementById('filterTerm')?.value || '';
     const rollover = document.getElementById('filterRollover')?.value || '';
-    const fund = document.getElementById('filterFund')?.value || '';
 
     let visible = 0, sumPrincipal = 0, sumInterest = 0, sumTotal = 0, activeCount = 0, maturedCount = 0;
     document.querySelectorAll('.saving-card').forEach(card => {
         const matchType = !type || card.dataset.savingType === type;
         const matchTerm = !term || card.dataset.term === term;
         const matchRollover = !rollover || card.dataset.rollover === rollover;
-        const matchFund = !fund || (fund === 'none' ? !card.dataset.fundId : card.dataset.fundId === fund);
-        const show = matchType && matchTerm && matchRollover && matchFund;
+        const show = matchType && matchTerm && matchRollover;
         card.style.display = show ? '' : 'none';
         if (show) {
             visible++;
@@ -479,7 +445,7 @@ function applyFilters() {
     });
 
     const total = document.querySelectorAll('.saving-card').length;
-    const isFiltered = term || rollover || fund;
+    const isFiltered = term || rollover;
 
     const countEl = document.getElementById('filterCount');
     if (countEl) countEl.textContent = isFiltered ? `${visible} of ${total} shown` : '';
@@ -498,7 +464,7 @@ function applyFilters() {
     if (val) val.textContent = fmtStat(sumTotal);
 }
 
-['filterType', 'filterTerm', 'filterRollover', 'filterFund'].forEach(id => {
+['filterType', 'filterTerm', 'filterRollover'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', applyFilters);
 });
@@ -508,7 +474,6 @@ function saveFilters() {
         type:     document.getElementById('filterType')?.value     || '',
         term:     document.getElementById('filterTerm')?.value    || '',
         rollover: document.getElementById('filterRollover')?.value || '',
-        fund:     document.getElementById('filterFund')?.value     || '',
     }));
 }
 
@@ -522,7 +487,6 @@ function saveFilters() {
         if (f.type     && document.getElementById('filterType'))     document.getElementById('filterType').value     = f.type;
         if (f.term     && document.getElementById('filterTerm'))     document.getElementById('filterTerm').value     = f.term;
         if (f.rollover && document.getElementById('filterRollover')) document.getElementById('filterRollover').value = f.rollover;
-        if (f.fund     && document.getElementById('filterFund'))     document.getElementById('filterFund').value     = f.fund;
         applyFilters();
     } catch(e) {}
 })();
@@ -579,8 +543,6 @@ document.getElementById('addSavingForm').addEventListener('submit', function(e) 
     const start_date = document.getElementById('savingStart').value;
     const rollover_type = document.getElementById('savingRollover').value;
     const note = document.getElementById('savingNote').value.trim();
-    const fund_id_val = document.getElementById('savingFund').value;
-    const fund_id = fund_id_val ? parseInt(fund_id_val) : null;
     const saving_type = document.querySelector('input[name="savingType"]:checked')?.value || 'fixed';
 
     if (!name || !principal || !annual_rate || !term_months || !start_date) return;
@@ -590,7 +552,7 @@ document.getElementById('addSavingForm').addEventListener('submit', function(e) 
     fetch('/api/savings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type })
+        body: JSON.stringify({ name, principal, annual_rate, term_months, start_date, rollover_type, note, saving_type })
     })
     .then(r => r.json())
     .then(res => {
@@ -652,8 +614,6 @@ function saveSavingEdit(id, btn) {
     const start_date = card.querySelector('.edit-start').value;
     const note = card.querySelector('.edit-note').value.trim();
     const rollover_type = card.querySelector('.edit-rollover').value;
-    const fund_id_val = card.querySelector('.edit-fund').value;
-    const fund_id = fund_id_val ? parseInt(fund_id_val) : null;
     const saving_type = card.querySelector('.edit-saving-type:checked')?.value || 'fixed';
     if (!name || !principal || !annual_rate || !term_months || !start_date) {
         showNotify('Please fill all required fields'); return;
@@ -662,7 +622,7 @@ function saveSavingEdit(id, btn) {
     fetch('/api/savings/' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, principal, annual_rate, term_months, start_date, rollover_type, note, fund_id, saving_type })
+        body: JSON.stringify({ name, principal, annual_rate, term_months, start_date, rollover_type, note, saving_type })
     })
     .then(r => r.json())
     .then(res => {
