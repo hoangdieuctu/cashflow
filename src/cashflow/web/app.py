@@ -24,8 +24,6 @@ def create_app(db_path: str | None = None) -> Flask:
     from cashflow.web.routes import bp
     app.register_blueprint(bp)
 
-    _start_backup_scheduler(app)
-
     from datetime import datetime, timezone
 
     @app.before_request
@@ -147,37 +145,6 @@ def create_app(db_path: str | None = None) -> Flask:
             return date.today()
 
     return app
-
-
-def _start_backup_scheduler(app: Flask) -> None:
-    """Start a background thread that sends a daily DB backup at the configured time."""
-    import threading
-    import time
-
-    def _run():
-        last_sent_date = None
-        while True:
-            time.sleep(30)
-            try:
-                from cashflow.database.repository import Repository
-                with Repository(app.config["DB_PATH"]) as repo:
-                    enabled = repo.get_setting("backup_schedule_enabled") == "1"
-                    hour = int(repo.get_setting("backup_schedule_hour") or 8)
-                    minute = int(repo.get_setting("backup_schedule_minute") or 0)
-                if not enabled:
-                    continue
-                from datetime import datetime
-                now = datetime.now()
-                today = now.date()
-                if now.hour == hour and now.minute == minute and last_sent_date != today:
-                    with app.app_context():
-                        _send_backup_email(app)
-                    last_sent_date = today
-            except Exception:
-                pass
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
 
 
 def _send_backup_email(app: Flask) -> None:

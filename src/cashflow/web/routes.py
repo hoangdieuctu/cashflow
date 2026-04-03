@@ -58,9 +58,6 @@ def settings():
             "smtp_port": repo.get_setting("backup_smtp_port") or "465",
             "smtp_user": repo.get_setting("backup_smtp_user") or "",
             "recipient": repo.get_setting("backup_recipient") or "",
-            "schedule_enabled": repo.get_setting("backup_schedule_enabled") == "1",
-            "schedule_hour": repo.get_setting("backup_schedule_hour") or "8",
-            "schedule_minute": repo.get_setting("backup_schedule_minute") or "0",
         }
     return render_template("settings.html", passcode_enabled=enabled, has_passcode=has_passcode, backup_email_config=backup_email_config)
 
@@ -88,28 +85,6 @@ def save_backup_email_config():
         if smtp_pass:
             repo.set_setting("backup_smtp_pass", smtp_pass)
         repo.set_setting("backup_recipient", recipient)
-    return jsonify({"ok": True})
-
-
-@bp.route("/api/settings/backup-schedule", methods=["POST"])
-def save_backup_schedule():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "JSON body required"}), 400
-    schedule_enabled = "1" if data.get("enabled") else "0"
-    hour = data.get("hour", 8)
-    minute = data.get("minute", 0)
-    try:
-        hour = int(hour)
-        minute = int(minute)
-        if not (0 <= hour <= 23 and 0 <= minute <= 59):
-            raise ValueError
-    except (TypeError, ValueError):
-        return jsonify({"error": "hour must be 0–23 and minute 0–59"}), 400
-    with _get_repo() as repo:
-        repo.set_setting("backup_schedule_enabled", schedule_enabled)
-        repo.set_setting("backup_schedule_hour", str(hour))
-        repo.set_setting("backup_schedule_minute", str(minute))
     return jsonify({"ok": True})
 
 
